@@ -7,7 +7,6 @@ local HEALTH = 10
 local SEAT = Angle(-90, 180, 90)
 local MINS, MAXS = Vector(-12, -12, -6), Vector(12, 12, 16)
 local CLING = 176 / 30
-local SUCKLE = 0.25
 local RUN_SLOW, RUN_FAST = 90, 270
 local RUN_RATE_MAX = 1.7
 local CIRCLE_SPEED = 110
@@ -20,43 +19,27 @@ local JOLT = 12
 local PRY_END = 0.4
 local STEP = 18
 local DROP = 48
-local FADE = 0.88
 local CORPSE_PUSH = 150
 local RUNS = { ACT_RUN_PROTECTED, ACT_RUN_PANICKED, ACT_RUN }
 local IDLES = { "idle_unarmed", "idle_subtle" }
 local UNARMED_IDLES = {
 	["models/monk.mdl"] = "LineIdle01",
 }
-local ZONE_IN = 2
-local ZONED_RATE = 0.25
-local EYES_BACK = 0.4
-local EYES_REACH = 100
-local ZONED_FACE = {
-	jaw_drop = 0.65,
-	right_mouth_drop = 0.35,
-	left_mouth_drop = 0.35,
-	right_lid_droop = 0.35,
-	left_lid_droop = 0.35,
-}
 local LURE_EVERY = 1
 local SKIP_FOR = 20
-local STUCK_TIME = 4
-local STUCK_GAIN = 16
-local WALK_RATE = 0.6
-local WALK_TURN = 90
+local REPATH = 2
 local WAYPOINT = 24
-local UNDER = 10
+local GUIDE = 0.35
+local GUIDE_TURN = 120
+local NEAR = 120
+local NEAR_SPEED = 0.6
+local NEAR_SWERVE = 0.2
+local UNDER = 20
 local OFFER_WAIT = 8
 local DROP_FIND = 4096
-local SPIRIT_MIN = 0.25
-local FIGHT = 0.25
-local EFFORT = { run = 1, circle = 1, pry = 0.5 }
-local HUNCH = {
-	["ValveBiped.Bip01_Spine"] = Angle(0, 2, 0),
-	["ValveBiped.Bip01_Spine1"] = Angle(0, 3, 0),
-	["ValveBiped.Bip01_Spine2"] = Angle(0, 3, 0),
-	["ValveBiped.Bip01_Spine4"] = Angle(0, 2, 0),
-}
+local THROW, THROW_UP, THROW_CLEAR = 220, 200, 16
+local SHUN = 15
+local FLEE = 600
 
 local function Valid(seq)
 	return seq and seq > 0 and seq or nil
@@ -112,29 +95,20 @@ function ENT:Grab(v)
 	self.prySeq = Valid(v:LookupSequence("headcrabbed"))
 	self.runGround = self.runSeq and v:GetSequenceGroundSpeed(self.runSeq) or 0
 	if self.runGround < 1 then self.runGround = RUN_FAST end
-	self.walkSeq = Valid(v:SelectWeightedSequence(ACT_WALK))
-	self.walkGround = self.walkSeq and v:GetSequenceGroundSpeed(self.walkSeq) or 0
-	if self.walkGround < 1 then self.walkSeq = nil end
 	if not Evil.Pose(v, self, { sequence = self.idleSeq }) then
 		self.victim = nil
 		return false
 	end
+	v:SetNotSolid(false)
 	self.seed = math.Rand(0, 100)
-	self.spirit = math.Rand(SPIRIT_MIN, 1)
-	self.fought = 0
-	v:SetNW2Float("EvilCrabSpirit", self.spirit)
 	self.start = CurTime()
-	self.done = self.start + (EvilHeadcrab.Settings:Get("instant_capture") ~= 0 and 0 or EvilHeadcrab.Settings:Get("capture_time"))
+	self.done = self.start + EvilHeadcrab.Settings:Get("hold_time")
 	self.beatEnd = 0
 	self.last = self.start
 	v:SetNW2Float("EvilCrabbed", self.start)
 	v:SetNW2Float("EvilCrabDone", self.done)
 	self:Seat(v)
-	if self.done > self.start then
-		self:Cling("headcrabbed", CLING / (self.done - self.start))
-	else
-		self:Enthrall()
-	end
+	self:Cling("headcrabbed", CLING / (self.done - self.start))
 	self:EmitSound("NPC_HeadCrab.Bite")
 	return true
 end
@@ -177,24 +151,15 @@ function ENT:Run(speed)
 	self:Play(self.runSeq, math.min(speed / self.runGround, RUN_RATE_MAX), true)
 end
 
-function ENT:Beat(p, i)
+function ENT:Beat(i, g, near)
 	local now = CurTime()
-	if p > FADE then
-		self:SavePry()
-		self.mode = "fade"
-		self.speed = math.Rand(0, 10)
-		self.heading = self.yaw + math.Rand(-30, 30)
-		self.beatEnd = self.done
-		self:Play(self.idleSeq, 0.5, true)
-		return
-	end
-	local roll, run = math.random(), Lerp(i, 0.3, 0.8)
-	if self.runSeq and roll < run then
+	local roll, run = math.random(), Lerp(g, Lerp(i, 0.3, 0.8), 1)
+	if self.runSeq and (near or roll < run) then
 		self.mode = "run"
-		self.heading = self.yaw + math.Rand(-1, 1) * Lerp(i, 50, 160)
+		self.heading = self.yaw + math.Rand(-1, 1) * Lerp(i, 50, 160) * (1 - g)
 		self.beatEnd = now + math.Rand(0.5, 1.4) * Lerp(i, 1.5, 0.8)
-		self:Run(Lerp(i, RUN_SLOW, RUN_FAST))
-	elseif self.runSeq and roll < run + 0.2 * i then
+		self:Run(Lerp(i, RUN_SLOW, RUN_FAST) * (near and NEAR_SPEED or 1))
+	elseif self.runSeq and roll < run + 0.2 * i * (1 - g) then
 		self.mode = "circle"
 		self.spin = (math.random(2) == 1 and 1 or -1) * CIRCLE_TURN * i
 		self.beatEnd = now + math.Rand(0.7, 1.4)
@@ -202,7 +167,6 @@ function ENT:Beat(p, i)
 	else
 		self:Pry(i)
 	end
-	self.beatEnd = math.min(self.beatEnd, self.start + (self.done - self.start) * FADE)
 end
 
 function ENT:Walk(step)
@@ -234,75 +198,22 @@ function ENT:Bump(i, wall)
 	self.recoil = CurTime() + math.Rand(0.15, 0.35)
 end
 
-function ENT:Struggle(now, dt)
-	local p = (now - self.start) / (self.done - self.start)
-	local i = EvilHeadcrab.Intensity(p) * self.spirit
-	if now >= self.beatEnd then self:Beat(p, i) end
-	self.fought = self.fought + (EFFORT[self.mode] or 0) * i * dt
-	if self.mode == "circle" then self.heading = self.heading + self.spin * dt end
-	self.swerve = self.swerve + dt * Lerp(i, SWERVE_HZ_SLOW, SWERVE_HZ_FAST) * math.pi * 2
-	local swerve = (math.sin(self.swerve) + 0.4 * math.sin(self.swerve * 2.3 + self.seed)) * Lerp(i, SWERVE_SLOW, SWERVE_FAST)
-	self.yaw = math.ApproachAngle(self.yaw, self.heading + swerve, Lerp(i, TURN_SLOW, TURN_FAST) * dt)
-	if self.speed > 0 and now >= self.recoil then
-		local to, wall = self:Walk(Angle(0, self.yaw, 0):Forward() * self.speed * dt)
-		if to then
-			self.pos = to
-		else
-			self:Bump(i, wall)
-		end
+function ENT:Sense(now)
+	local l = self.lure
+	if l then
+		local b = l.barnacle
+		if not IsValid(b) or b:Health() <= 0 or b.EvilThrall ~= self then return self:Abandon() end
+		if now < l.repath then return end
+		l.repath = now + REPATH
+		local path = EvilHeadcrab.Path(self.pos, l.spot)
+		if not path then return self:Abandon(true) end
+		l.path, l.i = path, 1
+		return
 	end
-end
-
-function ENT:Enthrall()
-	self.thrall = true
-	self.speed = 0
-	self:Play(self.idleSeq, ZONED_RATE, true)
-	self.victim:SetNotSolid(false)
-	self:Cling("headcrabbedpost", SUCKLE)
-	local v = self.victim
-	local z = { start = CurTime(), k = 0, bones = {}, flexes = {} }
-	for name, ang in pairs(HUNCH) do
-		local b = v:LookupBone(name)
-		if b then z.bones[b] = { base = v:GetManipulateBoneAngles(b), add = ang } end
-	end
-	for i = 0, v:GetFlexNum() - 1 do
-		local w = ZONED_FACE[v:GetFlexName(i)]
-		if w then z.flexes[i] = { base = v:GetFlexWeight(i), to = w } end
-	end
-	self.zoned = z
-end
-
-function ENT:ZoneOut(now)
-	local z, v = self.zoned, self.victim
-	if not z then return end
-	if z.k < 1 then
-		z.k = math.min((now - z.start) / ZONE_IN, 1)
-		local k = math.ease.InOutSine(z.k)
-		for b, s in pairs(z.bones) do
-			v:ManipulateBoneAngles(b, s.base + s.add * k)
-		end
-	end
-	if self.lifted and self.prey and self.prey.fighter then return end
-	local k = math.ease.InOutSine(z.k)
-	local face = self.lifted and self.lifted.body or v
-	for i, s in pairs(z.flexes) do
-		face:SetFlexWeight(i, Lerp(k, s.base, s.to))
-	end
-	local eyes = face:GetAttachment(face:LookupAttachment("eyes"))
-	if eyes then
-		local fwd, up = eyes.Ang:Forward(), eyes.Ang:Up()
-		face:SetEyeTarget(eyes.Pos + LerpVector(k, fwd, up - fwd * EYES_BACK) * EYES_REACH)
-	end
-end
-
-function ENT:Lure(now, dt)
-	if self.lifted then return self:Ride(now, dt) end
-	if self.offer then return self:Offer(now) end
-	if self.lure then return self:Seek(now, dt) end
 	if now < (self.nextLure or 0) then return end
 	self.nextLure = now + LURE_EVERY
 	local range = EvilHeadcrab.Settings:Get("barnacle_range")
-	if range <= 0 or not self.walkSeq then return end
+	if range <= 0 then return end
 	self.skip = self.skip or {}
 	local b, spot = EvilHeadcrab.FreeBarnacle(self.pos, range, self.skip)
 	if not b then return end
@@ -312,8 +223,62 @@ function ENT:Lure(now, dt)
 		return
 	end
 	b.EvilThrall = self
-	self.lure = { barnacle = b, spot = spot, path = path, i = 1, best = math.huge, progress = now }
-	self:Play(self.walkSeq, WALK_RATE, true)
+	self.lure = { barnacle = b, spot = spot, path = path, i = 1, repath = now + REPATH }
+end
+
+function ENT:Guide()
+	local l = self.lure
+	if not l then return end
+	local flat = l.spot - self.pos
+	flat.z = 0
+	local dist = flat:Length()
+	if dist < NEAR then return flat:Angle().y, 1, dist end
+	local to = l.path[l.i] - self.pos
+	to.z = 0
+	if to:Length() < WAYPOINT and l.i < #l.path then
+		l.i = l.i + 1
+		to = l.path[l.i] - self.pos
+		to.z = 0
+	end
+	return to:Angle().y, GUIDE, dist
+end
+
+function ENT:Struggle(now, dt, pinned)
+	local p = (now - self.start) / math.max(self.done - self.start, 0.1)
+	local i = EvilHeadcrab.Intensity(p)
+	local aim, g, dist
+	if not pinned then aim, g, dist = self:Guide() end
+	if dist and dist < UNDER then return self:Present() end
+	g = g or 0
+	local near = dist ~= nil and dist < NEAR
+	if now >= self.beatEnd or (near and self.mode ~= "run") then self:Beat(i, g, near) end
+	if aim and self.mode == "run" then
+		self.heading = near and aim or math.ApproachAngle(self.heading, aim, GUIDE_TURN * g * dt)
+	end
+	if self.mode == "circle" then self.heading = self.heading + self.spin * dt end
+	self.swerve = self.swerve + dt * Lerp(i, SWERVE_HZ_SLOW, SWERVE_HZ_FAST) * math.pi * 2
+	local swerve = (math.sin(self.swerve) + 0.4 * math.sin(self.swerve * 2.3 + self.seed)) * Lerp(i, SWERVE_SLOW, SWERVE_FAST) * (near and NEAR_SWERVE or 1)
+	self.yaw = math.ApproachAngle(self.yaw, self.heading + swerve, Lerp(i, TURN_SLOW, TURN_FAST) * dt)
+	if pinned or self.speed <= 0 or now < self.recoil then return end
+	local to, wall = self:Walk(Angle(0, self.yaw, 0):Forward() * self.speed * dt)
+	if to then
+		self.pos = to
+	else
+		self:Bump(i, wall)
+	end
+end
+
+function ENT:Pause()
+	self.left = math.max(self.done - CurTime(), 0)
+end
+
+function ENT:Resume()
+	local now = CurTime()
+	self.done = now + (self.left or 0)
+	self.left = nil
+	self.beatEnd = 0
+	self.victim:SetNW2Float("EvilCrabDone", self.done)
+	if self.done > now then self:SetPlaybackRate((1 - self:GetCycle()) * CLING / (self.done - now)) end
 end
 
 function ENT:Abandon(skip)
@@ -322,49 +287,13 @@ function ENT:Abandon(skip)
 	if not l then return end
 	if IsValid(l.barnacle) and l.barnacle.EvilThrall == self then l.barnacle.EvilThrall = nil end
 	if skip then self.skip[l.barnacle] = CurTime() + SKIP_FOR end
-	if IsValid(self.victim) then self:Play(self.idleSeq, ZONED_RATE, true) end
-end
-
-function ENT:Seek(now, dt)
-	local l = self.lure
-	local b = l.barnacle
-	if not IsValid(b) or b:Health() <= 0 or b.EvilThrall ~= self then return self:Abandon() end
-	local last = l.i == #l.path
-	local flat = l.path[l.i] - self.pos
-	flat.z = 0
-	local dist = flat:Length()
-	if dist < (last and UNDER or WAYPOINT) then
-		if last then return self:Present() end
-		l.i = l.i + 1
-		l.best = math.huge
-		l.progress = now
-		return
-	end
-	if dist < l.best - STUCK_GAIN then
-		l.best = dist
-		l.progress = now
-	elseif now - l.progress > STUCK_TIME then
-		return self:Abandon(true)
-	end
-	self.yaw = math.ApproachAngle(self.yaw, flat:Angle().y, WALK_TURN * dt)
-	local fwd = Angle(0, self.yaw, 0):Forward()
-	local step = math.min(self.walkGround * WALK_RATE * dt, dist)
-	local to, wall = self:Walk(fwd * step)
-	if not to and wall then
-		local n = Vector(wall.x, wall.y, 0)
-		if n:LengthSqr() > 0.01 then
-			n:Normalize()
-			to = self:Walk((fwd - n * fwd:Dot(n)) * step)
-		end
-	end
-	if to then self.pos = to end
 end
 
 function ENT:Present()
 	local b, v = self.lure.barnacle, self.victim
 	self.lure = nil
 	self.offer = { barnacle = b, ends = CurTime() + OFFER_WAIT }
-	self:Play(self.idleSeq, ZONED_RATE, true)
+	self:Pause()
 	b:AddEntityRelationship(v, D_HT, 99)
 	v:RemoveFlags(FL_NOTARGET)
 end
@@ -377,14 +306,20 @@ function ENT:Withdraw(skip)
 		if skip then self.skip[o.barnacle] = CurTime() + SKIP_FOR end
 	end
 	self.victim:AddFlags(FL_NOTARGET)
+	self:Resume()
 end
 
-function ENT:Offer(now)
+function ENT:Offer(now, dt)
 	local b, v = self.offer.barnacle, self.victim
 	if not IsValid(b) or b:Health() <= 0 then return self:Withdraw() end
 	local body = b:GetInternalVariable("m_hRagdoll")
 	if b:GetEnemy() == v and IsValid(body) then return self:Grabbed(b, body) end
 	if now > self.offer.ends then return self:Withdraw(true) end
+	if now >= self.beatEnd then
+		self:Pry(1)
+		self.speed = 0
+	end
+	self.yaw = math.ApproachAngle(self.yaw, self.heading, TURN_SLOW * dt)
 end
 
 function ENT:Seat(ent)
@@ -393,15 +328,10 @@ function ENT:Seat(ent)
 	self:SetLocalAngles(SEAT)
 end
 
-function ENT:Fighter()
-	local span = self.done - self.start
-	return span > 0 and self.fought / span >= FIGHT
-end
-
 function ENT:Grabbed(b, body)
 	self.offer = nil
 	self.lifted = { barnacle = b, body = body }
-	self.prey = EvilHeadcrab.Prey(body, b, self:Fighter())
+	self.prey = EvilHeadcrab.Prey(body, b, true)
 	self:Seat(body)
 end
 
@@ -429,7 +359,7 @@ function ENT:Dropped()
 	local tr = util.TraceLine({ start = start, endpos = start - Vector(0, 0, DROP_FIND), mask = MASK_NPCSOLID_BRUSHONLY })
 	self.pos = tr.HitPos
 	self.yaw = v:GetAngles().y
-	self:Play(self.idleSeq, ZONED_RATE, true)
+	self:Resume()
 end
 
 function ENT:Transfer()
@@ -463,20 +393,20 @@ function ENT:Think()
 			self:FallOff()
 			return
 		end
-		if not self.thrall then
-			if now < self.done then
-				self:Struggle(now, dt)
-			else
-				self:Enthrall()
-			end
-		end
-		if self.thrall then
-			self:ZoneOut(now)
+		if self.lifted then
+			self:Ride(now, dt)
+		elseif self.offer then
+			self:Offer(now, dt)
+		elseif now >= self.done then
+			self:PryOff()
+			return
+		else
 			if self.held then
 				self:Carry()
 			else
-				self:Lure(now, dt)
+				self:Sense(now)
 			end
+			if self.victim then self:Struggle(now, dt, self.held ~= nil) end
 		end
 	end
 	self:NextThink(now)
@@ -484,14 +414,13 @@ function ENT:Think()
 end
 
 function ENT:Hold(ply)
-	if not self.thrall or self.lifted then return end
+	if not self.victim or self.lifted then return end
 	if self.lure then self:Abandon() end
 	if self.offer then self:Withdraw() end
 	local from = ply:GetShootPos()
 	local grab = ply:GetEyeTrace().HitPos
 	self.held = { ply = ply, dist = grab:Distance(from), offset = grab - self.pos }
 	ply.EvilCarrying = self
-	self:Play(self.idleSeq, ZONED_RATE, true)
 end
 
 function ENT:Carry()
@@ -524,13 +453,6 @@ function ENT:Release()
 	self.victim = nil
 	if not IsValid(v) then return end
 	v.EvilCrab = nil
-	local z = self.zoned
-	if z then
-		for b, s in pairs(z.bones) do v:ManipulateBoneAngles(b, s.base) end
-		for i, s in pairs(z.flexes) do v:SetFlexWeight(i, s.base) end
-		local eyes = v:GetAttachment(v:LookupAttachment("eyes"))
-		if eyes then v:SetEyeTarget(eyes.Pos + eyes.Ang:Forward() * EYES_REACH) end
-	end
 	v:SetNW2Float("EvilCrabbed", 0)
 	v:SetNW2Float("EvilCrabDone", 0)
 	if Evil.Owner(v) == self then Evil.Unpose(v, self) end
@@ -547,16 +469,47 @@ function ENT:Handover(ent)
 	cleanup.Add(ply, "sents", ent)
 end
 
+function ENT:Shed(pos, yaw, vel, shun)
+	local crab = ents.Create("evil_headcrab")
+	crab:SetPos(vel and pos + vel:GetNormalized() * THROW_CLEAR or pos)
+	crab:SetAngles(Angle(0, yaw, 0))
+	crab.carried = self:Health()
+	crab.shun = shun
+	crab:Spawn()
+	crab:Activate()
+	if vel then
+		crab.loco:Jump()
+		crab.loco:SetVelocity(vel)
+	end
+	self:Handover(crab)
+	return crab
+end
+
+local function Flee(v, away)
+	local goal = v:GetPos() + away * FLEE
+	if navmesh.IsLoaded() then
+		local area = navmesh.GetNearestNavArea(goal)
+		if area then goal = area:GetClosestPointOnArea(goal) or goal end
+	end
+	v:SetLastPosition(goal)
+	v:SetSchedule(SCHED_FORCED_GO_RUN)
+end
+
+function ENT:PryOff()
+	local v, pos = self.victim, self:GetPos()
+	local yaw = self.yaw + 180 + math.Rand(-60, 60)
+	local throw = Angle(0, yaw, 0):Forward()
+	self:Release()
+	local crab = self:Shed(pos, yaw, throw * THROW + Vector(0, 0, THROW_UP), { [v] = CurTime() + SHUN })
+	crab:EmitSound("NPC_HeadCrab.Pain")
+	if IsValid(v) then Flee(v, -throw) end
+	self:Remove()
+end
+
 function ENT:FallOff()
 	local pos, yaw = self:GetPos(), self:GetAngles().y
 	self:Release()
-	local crab = ents.Create("evil_headcrab")
-	crab:SetPos(pos)
-	crab:SetAngles(Angle(0, yaw, 0))
-	crab.carried = self:Health()
-	crab:Spawn()
-	crab:Activate()
-	self:Handover(crab)
+	self:Shed(pos, yaw)
 	self:Remove()
 end
 

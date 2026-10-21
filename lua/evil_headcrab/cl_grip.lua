@@ -1,5 +1,4 @@
 local BLEND = 2
-local LET_GO = 2.5
 local GRIP_UP, GRIP_OUT, GRIP_FWD = 5, 9, 1
 local TUG_UP, TUG_OUT = 2.5, 3.5
 local TUG_SLOW, TUG_FAST = 0.7, 2.2
@@ -93,12 +92,11 @@ local function Build(ent)
 	local done = ent:GetNW2Float("EvilCrabDone", start + 1)
 	local now = CurTime()
 	local p = math.Clamp((now - start) / math.max(done - start, 0.1), 0, 1)
-	local i = EvilHeadcrab.Intensity(p) * ent:GetNW2Float("EvilCrabSpirit", 1)
-	local want = p < 0.5 and 1 or math.min(i * LET_GO, 1)
+	local i = EvilHeadcrab.Intensity(p)
 	local t = RealTime()
 	local dt = math.min(t - (ent.EvilCrabGripAt or t), 0.1)
 	ent.EvilCrabGripAt = t
-	ent.EvilCrabGrip = math.Approach(ent.EvilCrabGrip or 0, want, dt * BLEND)
+	ent.EvilCrabGrip = math.Approach(ent.EvilCrabGrip or 0, 1, dt * BLEND)
 	ent.EvilCrabTug = (ent.EvilCrabTug or 0) + dt * Lerp(i, TUG_SLOW, TUG_FAST) * math.pi * 2
 	local k = ent.EvilCrabGrip
 	if k <= 0.01 then return end

@@ -63,6 +63,7 @@ function ENT:Host(ent)
 	local class = ent:GetClass()
 	if class:find("headcrab", 1, true) or class:find("zombie", 1, true) then return false end
 	if Evil.Frozen(ent) or Evil.Downed(ent) or not Evil.Claimable(ent, self) then return false end
+	if self.shun and (self.shun[ent] or 0) > CurTime() then return false end
 	return ent:LookupBone(EvilHeadcrab.HEAD) ~= nil
 end
 
