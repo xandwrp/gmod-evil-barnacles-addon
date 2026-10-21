@@ -55,3 +55,4 @@ AddCSLuaFile("evil_headcrab/cl_grip.lua")
 include("evil_headcrab/sh_settings.lua")
 include("evil_headcrab/sh_struggle.lua")
 if CLIENT then include("evil_headcrab/cl_grip.lua") end
+if SERVER then include("evil_headcrab/sv_barnacle.lua") end
