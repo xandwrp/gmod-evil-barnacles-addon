@@ -50,6 +50,8 @@ end
 include("evil_api/init.lua")
 
 AddCSLuaFile("evil_headcrab/sh_settings.lua")
+AddCSLuaFile("evil_headcrab/sh_struggle.lua")
 AddCSLuaFile("evil_headcrab/cl_grip.lua")
 include("evil_headcrab/sh_settings.lua")
+include("evil_headcrab/sh_struggle.lua")
 if CLIENT then include("evil_headcrab/cl_grip.lua") end

@@ -1,8 +1,8 @@
-local FADE = 0.8
-local BLEND = 3
+local BLEND = 2
+local LET_GO = 2.5
 local GRIP_UP, GRIP_OUT, GRIP_FWD = 5, 9, 1
-local TUG_UP, TUG_OUT = 2, 3
-local TUG_FAST, TUG_SLOW = 4, 1.2
+local TUG_UP, TUG_OUT = 2.5, 3.5
+local TUG_SLOW, TUG_FAST = 0.7, 2.2
 local ELBOW_FWD = 0.3
 local ARMS = {
 	{ "ValveBiped.Bip01_R_UpperArm", "ValveBiped.Bip01_R_Forearm", "ValveBiped.Bip01_R_Hand", 1, 0 },
@@ -24,8 +24,7 @@ local function Rig(ent)
 	rig = false
 	local head = ent:LookupBone(EvilHeadcrab.HEAD)
 	if head then
-		local pry = ent:LookupSequence("headcrabbed")
-		rig = { head = head, pry = pry > 0 and pry or nil, arms = {} }
+		rig = { head = head, arms = {} }
 		for _, a in ipairs(ARMS) do
 			local upper, fore, hand = ent:LookupBone(a[1]), ent:LookupBone(a[2]), ent:LookupBone(a[3])
 			if upper and fore and hand then
@@ -46,18 +45,21 @@ local function Turn(ent, bones, pivot, from, to)
 	if s < 1e-4 then return end
 	axis:Div(s)
 	local c = from:Dot(to)
-	local function Rotate(v)
-		return v * c + axis:Cross(v) * s + axis * (axis:Dot(v) * (1 - c))
-	end
+	local t = 1 - c
+	local x, y, z = axis.x, axis.y, axis.z
+	local r11, r12, r13 = c + x * x * t, x * y * t - z * s, x * z * t + y * s
+	local r21, r22, r23 = y * x * t + z * s, c + y * y * t, y * z * t - x * s
+	local r31, r32, r33 = z * x * t - y * s, z * y * t + x * s, c + z * z * t
+	local px, py, pz = pivot.x, pivot.y, pivot.z
+	local move = Matrix({
+		{ r11, r12, r13, px - (r11 * px + r12 * py + r13 * pz) },
+		{ r21, r22, r23, py - (r21 * px + r22 * py + r23 * pz) },
+		{ r31, r32, r33, pz - (r31 * px + r32 * py + r33 * pz) },
+		{ 0, 0, 0, 1 },
+	})
 	for _, b in ipairs(bones) do
 		local m = ent:GetBoneMatrix(b)
-		if m then
-			m:SetTranslation(pivot + Rotate(m:GetTranslation() - pivot))
-			m:SetForward(Rotate(m:GetForward()))
-			m:SetRight(Rotate(m:GetRight()))
-			m:SetUp(Rotate(m:GetUp()))
-			ent:SetBoneMatrix(b, m)
-		end
+		if m then ent:SetBoneMatrix(b, move * m) end
 	end
 end
 
@@ -91,24 +93,26 @@ local function Build(ent)
 	local done = ent:GetNW2Float("EvilCrabDone", start + 1)
 	local now = CurTime()
 	local p = math.Clamp((now - start) / math.max(done - start, 0.1), 0, 1)
-	local want = (rig.pry and ent:GetSequence() == rig.pry) and 0 or 1
-	want = want * math.Clamp((1 - p) / (1 - FADE), 0, 1)
+	local i = EvilHeadcrab.Intensity(p)
+	local want = p < 0.5 and 1 or math.min(i * LET_GO, 1)
 	local t = RealTime()
-	ent.EvilCrabGrip = math.Approach(ent.EvilCrabGrip or 0, want, (t - (ent.EvilCrabGripAt or t)) * BLEND)
+	local dt = math.min(t - (ent.EvilCrabGripAt or t), 0.1)
 	ent.EvilCrabGripAt = t
+	ent.EvilCrabGrip = math.Approach(ent.EvilCrabGrip or 0, want, dt * BLEND)
+	ent.EvilCrabTug = (ent.EvilCrabTug or 0) + dt * Lerp(i, TUG_SLOW, TUG_FAST) * math.pi * 2
 	local k = ent.EvilCrabGrip
 	if k <= 0.01 then return end
 	local hm = ent:GetBoneMatrix(rig.head)
 	if not hm then return end
 	local hp, up, face, right = hm:GetTranslation(), hm:GetForward(), hm:GetRight(), hm:GetUp()
-	local vigor = 1 - p
-	local freq = Lerp(p, TUG_FAST, TUG_SLOW) * math.pi * 2
 	for _, arm in ipairs(rig.arms) do
 		local mh = ent:GetBoneMatrix(arm.hand)
 		if mh then
-			local wave = now * freq + arm.phase
-			local grip = hp + up * (GRIP_UP + math.sin(wave) * TUG_UP * vigor)
-				+ right * (arm.side * (GRIP_OUT + math.cos(wave * 0.7) * TUG_OUT * vigor))
+			local wave = ent.EvilCrabTug + arm.phase
+			local pull = (math.sin(wave) + 0.5 * math.sin(wave * 1.7 + 1.3)) / 1.5
+			local twist = (math.cos(wave * 0.8) + 0.5 * math.sin(wave * 1.3 + 0.4)) / 1.5
+			local grip = hp + up * (GRIP_UP + twist * TUG_UP * i)
+				+ right * (arm.side * (GRIP_OUT + pull * TUG_OUT * i))
 				+ face * GRIP_FWD
 			Reach(ent, arm, LerpVector(k, mh:GetTranslation(), grip), right * arm.side + face * ELBOW_FWD)
 		end
