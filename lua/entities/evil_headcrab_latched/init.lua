@@ -27,6 +27,21 @@ local IDLES = { "idle_unarmed", "idle_subtle" }
 local UNARMED_IDLES = {
 	["models/monk.mdl"] = "LineIdle01",
 }
+local ZONE_IN = 2
+local ZONED_RATE = 0.25
+local ZONED_FACE = {
+	jaw_drop = 0.65,
+	right_mouth_drop = 0.35,
+	left_mouth_drop = 0.35,
+	right_lid_droop = 0.35,
+	left_lid_droop = 0.35,
+}
+local HUNCH = {
+	["ValveBiped.Bip01_Spine"] = Angle(0, 2, 0),
+	["ValveBiped.Bip01_Spine1"] = Angle(0, 3, 0),
+	["ValveBiped.Bip01_Spine2"] = Angle(0, 3, 0),
+	["ValveBiped.Bip01_Spine4"] = Angle(0, 2, 0),
+}
 
 local function Valid(seq)
 	return seq and seq > 0 and seq or nil
@@ -220,9 +235,36 @@ end
 function ENT:Enthrall()
 	self.thrall = true
 	self.speed = 0
-	self:Play(self.idleSeq, 0.5, true)
+	self:Play(self.idleSeq, ZONED_RATE, true)
 	self.victim:SetNotSolid(false)
 	self:Cling("headcrabbedpost", SUCKLE)
+	local v = self.victim
+	local z = { start = CurTime(), k = 0, bones = {}, flexes = {} }
+	for name, ang in pairs(HUNCH) do
+		local b = v:LookupBone(name)
+		if b then z.bones[b] = { base = v:GetManipulateBoneAngles(b), add = ang } end
+	end
+	for i = 0, v:GetFlexNum() - 1 do
+		local w = ZONED_FACE[v:GetFlexName(i)]
+		if w then z.flexes[i] = { base = v:GetFlexWeight(i), to = w } end
+	end
+	self.zoned = z
+end
+
+function ENT:ZoneOut(now)
+	local z, v = self.zoned, self.victim
+	if not z then return end
+	if z.k < 1 then
+		z.k = math.min((now - z.start) / ZONE_IN, 1)
+		local k = math.ease.InOutSine(z.k)
+		for b, s in pairs(z.bones) do
+			v:ManipulateBoneAngles(b, s.base + s.add * k)
+		end
+	end
+	local k = math.ease.InOutSine(z.k)
+	for i, s in pairs(z.flexes) do
+		v:SetFlexWeight(i, Lerp(k, s.base, s.to))
+	end
 end
 
 function ENT:Think()
@@ -242,6 +284,7 @@ function ENT:Think()
 				self:Enthrall()
 			end
 		end
+		if self.thrall then self:ZoneOut(now) end
 	end
 	self:NextThink(now)
 	return true
@@ -251,6 +294,11 @@ function ENT:Release()
 	local v = self.victim
 	self.victim = nil
 	if not IsValid(v) then return end
+	local z = self.zoned
+	if z then
+		for b, s in pairs(z.bones) do v:ManipulateBoneAngles(b, s.base) end
+		for i, s in pairs(z.flexes) do v:SetFlexWeight(i, s.base) end
+	end
 	v:SetNW2Float("EvilCrabbed", 0)
 	v:SetNW2Float("EvilCrabDone", 0)
 	if Evil.Owner(v) == self then Evil.Unpose(v, self) end
