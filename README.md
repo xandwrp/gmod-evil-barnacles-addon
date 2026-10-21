@@ -15,7 +15,7 @@ Entities > Syhgma's Evil Entities > Evil headcrab.
 - Wanders around and idles, using the navmesh if the map has one
 - Leaps onto NPCs' heads
 - Whoever it lands on panics, runs around blind and tries to pry it off, then slowly loses it
-- Once it has them they slump and just stand there with it on their head
+- Once it has them they just stand there with it on their head
 - Shoot it off to let them go
 
 ## Settings

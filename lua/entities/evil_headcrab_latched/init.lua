@@ -21,18 +21,9 @@ local PRY_END = 0.4
 local STEP = 18
 local DROP = 48
 local FADE = 0.88
-local SLUMP_FROM = 0.6
 local CORPSE_PUSH = 150
 local RUNS = { ACT_RUN_PROTECTED, ACT_RUN_PANICKED, ACT_RUN }
 local IDLES = { "idle_unarmed", "idle_subtle" }
-local SLUMP = {
-	["ValveBiped.Bip01_Spine"] = Angle(0, 6, 0),
-	["ValveBiped.Bip01_Spine1"] = Angle(0, 8, 0),
-	["ValveBiped.Bip01_Spine2"] = Angle(0, 8, 0),
-	["ValveBiped.Bip01_Spine4"] = Angle(0, 6, 0),
-	["ValveBiped.Bip01_Neck1"] = Angle(0, -15, 0),
-	["ValveBiped.Bip01_Head1"] = Angle(8, -25, 0),
-}
 
 local function Valid(seq)
 	return seq and seq > 0 and seq or nil
@@ -94,11 +85,6 @@ function ENT:Grab(v)
 	self.done = self.start + math.Rand(STRUGGLE_MIN, STRUGGLE_MAX)
 	self.beatEnd = 0
 	self.last = self.start
-	self.bones = {}
-	for name, ang in pairs(SLUMP) do
-		local b = v:LookupBone(name)
-		if b then self.bones[b] = { base = v:GetManipulateBoneAngles(b), add = ang } end
-	end
 	v:SetNW2Float("EvilCrabbed", self.start)
 	v:SetNW2Float("EvilCrabDone", self.done)
 	self:FollowBone(v, head)
@@ -204,16 +190,6 @@ function ENT:Bump(i, wall)
 	self.recoil = CurTime() + math.Rand(0.15, 0.35)
 end
 
-function ENT:Slump(p)
-	local k = math.Clamp((p - SLUMP_FROM) / (1 - SLUMP_FROM), 0, 1)
-	if self.slumped and (k == self.slumped or (k < 1 and math.abs(k - self.slumped) < 0.05)) then return end
-	self.slumped = k
-	k = math.ease.InOutSine(k)
-	for b, s in pairs(self.bones) do
-		self.victim:ManipulateBoneAngles(b, s.base + s.add * k)
-	end
-end
-
 function ENT:Struggle(now, dt)
 	local p = (now - self.start) / (self.done - self.start)
 	local i = EvilHeadcrab.Intensity(p)
@@ -230,13 +206,11 @@ function ENT:Struggle(now, dt)
 			self:Bump(i, wall)
 		end
 	end
-	self:Slump(p)
 end
 
 function ENT:Enthrall()
 	self.thrall = true
 	self.speed = 0
-	self:Slump(1)
 	self:Play(self.idleSeq, 0.5, true)
 	self.victim:SetNotSolid(false)
 	self:Cling("headcrabbedpost", 1)
@@ -268,9 +242,6 @@ function ENT:Release()
 	local v = self.victim
 	self.victim = nil
 	if not IsValid(v) then return end
-	for b, s in pairs(self.bones or {}) do
-		v:ManipulateBoneAngles(b, s.base)
-	end
 	v:SetNW2Float("EvilCrabbed", 0)
 	v:SetNW2Float("EvilCrabDone", 0)
 	if Evil.Owner(v) == self then Evil.Unpose(v, self) end
