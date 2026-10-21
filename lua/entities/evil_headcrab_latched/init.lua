@@ -7,6 +7,7 @@ local HEALTH = 10
 local SEAT = Angle(-90, 180, 90)
 local MINS, MAXS = Vector(-12, -12, -6), Vector(12, 12, 16)
 local CLING = 176 / 30
+local SUCKLE = 0.25
 local RUN_SLOW, RUN_FAST = 90, 270
 local RUN_RATE_MAX = 1.7
 local CIRCLE_SPEED = 110
@@ -221,7 +222,7 @@ function ENT:Enthrall()
 	self.speed = 0
 	self:Play(self.idleSeq, 0.5, true)
 	self.victim:SetNotSolid(false)
-	self:Cling("headcrabbedpost", 1)
+	self:Cling("headcrabbedpost", SUCKLE)
 end
 
 function ENT:Think()
