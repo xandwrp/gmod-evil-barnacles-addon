@@ -8,12 +8,20 @@ local SEAT = Angle(-90, 180, 90)
 local MINS, MAXS = Vector(-12, -12, -6), Vector(12, 12, 16)
 local STRUGGLE_MIN, STRUGGLE_MAX = 10, 15
 local CLING = 176 / 30
-local RUN_SPEED = 190
+local RUN_SLOW, RUN_FAST = 90, 270
+local RUN_RATE_MAX = 1.7
+local CIRCLE_SPEED = 110
+local CIRCLE_TURN = 420
+local STAGGER_SLOW, STAGGER_FAST = 8, 45
+local TURN_SLOW, TURN_FAST = 140, 600
+local SWERVE_SLOW, SWERVE_FAST = 8, 40
+local SWERVE_HZ_SLOW, SWERVE_HZ_FAST = 0.3, 0.9
+local JOLT = 12
+local PRY_END = 0.4
 local STEP = 18
 local DROP = 48
-local TURN = 360
-local FADE = 0.8
-local SLUMP_FROM = 0.75
+local FADE = 0.88
+local SLUMP_FROM = 0.6
 local CORPSE_PUSH = 150
 local RUNS = { ACT_RUN_PROTECTED, ACT_RUN_PANICKED, ACT_RUN }
 local IDLES = { "idle_unarmed", "idle_subtle" }
@@ -69,11 +77,14 @@ function ENT:Grab(v)
 	self.yaw = v:GetAngles().y
 	self.heading = self.yaw
 	self.speed = 0
+	self.swerve = 0
+	self.recoil = 0
+	self.pryCycle = 0
 	self.runSeq = RunSequence(v)
 	self.idleSeq = IdleSequence(v)
 	self.prySeq = Valid(v:LookupSequence("headcrabbed"))
 	self.runGround = self.runSeq and v:GetSequenceGroundSpeed(self.runSeq) or 0
-	if self.runGround < 1 then self.runGround = RUN_SPEED end
+	if self.runGround < 1 then self.runGround = RUN_FAST end
 	if not Evil.Pose(v, self, { sequence = self.idleSeq }) then
 		self.victim = nil
 		return false
@@ -110,33 +121,56 @@ function ENT:Play(seq, rate, loop, cycle)
 	if cycle then v:SetCycle(cycle) end
 end
 
-function ENT:Pry(seconds)
-	self.speed = math.Rand(0, 20)
-	self.heading = self.yaw + math.Rand(-60, 60)
-	self.beatEnd = CurTime() + (seconds or math.Rand(1, 2.2))
+function ENT:SavePry()
+	local v = self.victim
+	if self.mode ~= "pry" or not self.prySeq or v:GetSequence() ~= self.prySeq then return end
+	local c = v:GetCycle()
+	self.pryCycle = c < PRY_END and c or 0
+end
+
+function ENT:Pry(i, seconds)
+	self:SavePry()
+	self.mode = "pry"
+	self.speed = Lerp(i, STAGGER_SLOW, STAGGER_FAST)
+	self.heading = self.yaw + math.Rand(-90, 90)
+	self.beatEnd = CurTime() + (seconds or math.Rand(0.6, 1.2) * Lerp(i, 1.8, 1))
 	if self.prySeq then
-		self:Play(self.prySeq, 1, false, math.Rand(0, 0.35))
+		self:Play(self.prySeq, Lerp(i, 0.8, 1.3), false, self.pryCycle)
 	else
-		self:Play(self.idleSeq, 1.5, true)
+		self:Play(self.idleSeq, Lerp(i, 1, 2), true)
 	end
 end
 
-function ENT:Beat(p)
+function ENT:Run(speed)
+	self:SavePry()
+	self.speed = speed
+	self:Play(self.runSeq, math.min(speed / self.runGround, RUN_RATE_MAX), true)
+end
+
+function ENT:Beat(p, i)
+	local now = CurTime()
 	if p > FADE then
-		self.speed = math.Rand(0, 12)
-		self.heading = self.yaw + math.Rand(-40, 40)
+		self:SavePry()
+		self.mode = "fade"
+		self.speed = math.Rand(0, 10)
+		self.heading = self.yaw + math.Rand(-30, 30)
 		self.beatEnd = self.done
-		self:Play(self.idleSeq, 0.6, true)
+		self:Play(self.idleSeq, 0.5, true)
 		return
 	end
-	local k = p / FADE
-	if self.runSeq and math.random() < Lerp(k, 0.75, 0.35) then
-		self.speed = RUN_SPEED * Lerp(k, 1, 0.45)
-		self.heading = self.yaw + math.Rand(-120, 120)
-		self.beatEnd = CurTime() + math.Rand(0.8, 2)
-		self:Play(self.runSeq, self.speed / self.runGround, true)
+	local roll, run = math.random(), Lerp(i, 0.3, 0.8)
+	if self.runSeq and roll < run then
+		self.mode = "run"
+		self.heading = self.yaw + math.Rand(-1, 1) * Lerp(i, 50, 160)
+		self.beatEnd = now + math.Rand(0.5, 1.4) * Lerp(i, 1.5, 0.8)
+		self:Run(Lerp(i, RUN_SLOW, RUN_FAST))
+	elseif self.runSeq and roll < run + 0.2 * i then
+		self.mode = "circle"
+		self.spin = (math.random(2) == 1 and 1 or -1) * CIRCLE_TURN * i
+		self.beatEnd = now + math.Rand(0.7, 1.4)
+		self:Run(CIRCLE_SPEED * i)
 	else
-		self:Pry()
+		self:Pry(i)
 	end
 	self.beatEnd = math.min(self.beatEnd, self.start + (self.done - self.start) * FADE)
 end
@@ -147,16 +181,27 @@ function ENT:Walk(step)
 	local up = Vector(0, 0, STEP)
 	local filter = { v, self }
 	local tr = util.TraceHull({ start = self.pos + up, endpos = self.pos + up + step, mins = mins, maxs = maxs, filter = filter, mask = MASK_NPCSOLID })
-	if tr.StartSolid or tr.Hit then return end
+	if tr.StartSolid then return end
+	if tr.Hit then return nil, tr.HitNormal end
 	local down = util.TraceHull({ start = tr.HitPos, endpos = tr.HitPos - Vector(0, 0, STEP + DROP), mins = mins, maxs = maxs, filter = filter, mask = MASK_NPCSOLID })
 	if down.StartSolid or not down.Hit then return end
 	return down.HitPos
 end
 
-function ENT:Bump(p)
-	if p < FADE then self:Pry(math.Rand(0.6, 1.2)) end
-	self.speed = 0
-	self.heading = self.yaw + 180 + math.Rand(-70, 70)
+function ENT:Bump(i, wall)
+	if (self.mode ~= "run" or math.random() > i) and self.mode ~= "pry" then
+		self:Pry(i, math.Rand(0.4, 0.9))
+	end
+	local dir = Angle(0, self.yaw, 0):Forward()
+	local n = wall and Vector(wall.x, wall.y, 0)
+	if n and n:LengthSqr() > 0.01 then
+		n:Normalize()
+		self.heading = (dir - n * (2 * dir:Dot(n))):Angle().y + math.Rand(-35, 35)
+		self.yaw = self.yaw + math.Rand(-JOLT, JOLT) * i
+	else
+		self.heading = self.yaw + 180 + math.Rand(-40, 40)
+	end
+	self.recoil = CurTime() + math.Rand(0.15, 0.35)
 end
 
 function ENT:Slump(p)
@@ -171,16 +216,18 @@ end
 
 function ENT:Struggle(now, dt)
 	local p = (now - self.start) / (self.done - self.start)
-	if now >= self.beatEnd then self:Beat(p) end
-	local vigor = 1 - p * 0.6
-	local wobble = math.sin(now * 2.7 + self.seed) * 30 * vigor
-	self.yaw = math.ApproachAngle(self.yaw, self.heading + wobble, TURN * vigor * dt)
-	if self.speed > 0 then
-		local to = self:Walk(Angle(0, self.yaw, 0):Forward() * self.speed * dt)
+	local i = EvilHeadcrab.Intensity(p)
+	if now >= self.beatEnd then self:Beat(p, i) end
+	if self.mode == "circle" then self.heading = self.heading + self.spin * dt end
+	self.swerve = self.swerve + dt * Lerp(i, SWERVE_HZ_SLOW, SWERVE_HZ_FAST) * math.pi * 2
+	local swerve = (math.sin(self.swerve) + 0.4 * math.sin(self.swerve * 2.3 + self.seed)) * Lerp(i, SWERVE_SLOW, SWERVE_FAST)
+	self.yaw = math.ApproachAngle(self.yaw, self.heading + swerve, Lerp(i, TURN_SLOW, TURN_FAST) * dt)
+	if self.speed > 0 and now >= self.recoil then
+		local to, wall = self:Walk(Angle(0, self.yaw, 0):Forward() * self.speed * dt)
 		if to then
 			self.pos = to
 		else
-			self:Bump(p)
+			self:Bump(i, wall)
 		end
 	end
 	self:Slump(p)
