@@ -23,3 +23,4 @@ Entities > Syhgma's Evil Entities > Evil headcrab.
 Spawn menu > Utilities > Syhgma's Evil Entities > Evil headcrabs (superadmins), or the convars. They all start with `evil_headcrab_`.
 
 - Targets NPCs
+- Capture time, how many seconds a victim struggles before it has them

@@ -6,7 +6,6 @@ local MODEL = "models/headcrabclassic.mdl"
 local HEALTH = 10
 local SEAT = Angle(-90, 180, 90)
 local MINS, MAXS = Vector(-12, -12, -6), Vector(12, 12, 16)
-local STRUGGLE_MIN, STRUGGLE_MAX = 10, 15
 local CLING = 176 / 30
 local RUN_SLOW, RUN_FAST = 90, 270
 local RUN_RATE_MAX = 1.7
@@ -82,7 +81,7 @@ function ENT:Grab(v)
 	end
 	self.seed = math.Rand(0, 100)
 	self.start = CurTime()
-	self.done = self.start + math.Rand(STRUGGLE_MIN, STRUGGLE_MAX)
+	self.done = self.start + EvilHeadcrab.Settings:Get("capture_time")
 	self.beatEnd = 0
 	self.last = self.start
 	v:SetNW2Float("EvilCrabbed", self.start)
