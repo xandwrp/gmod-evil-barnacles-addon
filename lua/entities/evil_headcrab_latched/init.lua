@@ -23,6 +23,9 @@ local FADE = 0.88
 local CORPSE_PUSH = 150
 local RUNS = { ACT_RUN_PROTECTED, ACT_RUN_PANICKED, ACT_RUN }
 local IDLES = { "idle_unarmed", "idle_subtle" }
+local UNARMED_IDLES = {
+	["models/monk.mdl"] = "LineIdle01",
+}
 
 local function Valid(seq)
 	return seq and seq > 0 and seq or nil
@@ -36,6 +39,8 @@ local function RunSequence(v)
 end
 
 local function IdleSequence(v)
+	local unarmed = Valid(v:LookupSequence(UNARMED_IDLES[string.lower(v:GetModel() or "")] or ""))
+	if unarmed then return unarmed end
 	for _, name in ipairs(IDLES) do
 		local seq = Valid(v:LookupSequence(name))
 		if seq then return seq end
