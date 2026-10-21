@@ -29,6 +29,8 @@ local UNARMED_IDLES = {
 }
 local ZONE_IN = 2
 local ZONED_RATE = 0.25
+local EYES_BACK = 0.4
+local EYES_REACH = 100
 local ZONED_FACE = {
 	jaw_drop = 0.65,
 	right_mouth_drop = 0.35,
@@ -265,6 +267,11 @@ function ENT:ZoneOut(now)
 	for i, s in pairs(z.flexes) do
 		v:SetFlexWeight(i, Lerp(k, s.base, s.to))
 	end
+	local eyes = v:GetAttachment(v:LookupAttachment("eyes"))
+	if eyes then
+		local fwd, up = eyes.Ang:Forward(), eyes.Ang:Up()
+		v:SetEyeTarget(eyes.Pos + LerpVector(k, fwd, up - fwd * EYES_BACK) * EYES_REACH)
+	end
 end
 
 function ENT:Think()
@@ -298,6 +305,8 @@ function ENT:Release()
 	if z then
 		for b, s in pairs(z.bones) do v:ManipulateBoneAngles(b, s.base) end
 		for i, s in pairs(z.flexes) do v:SetFlexWeight(i, s.base) end
+		local eyes = v:GetAttachment(v:LookupAttachment("eyes"))
+		if eyes then v:SetEyeTarget(eyes.Pos + eyes.Ang:Forward() * EYES_REACH) end
 	end
 	v:SetNW2Float("EvilCrabbed", 0)
 	v:SetNW2Float("EvilCrabDone", 0)
