@@ -92,6 +92,7 @@ function EvilHeadcrab.Kill(ent, attacker)
 end
 
 local function Unpin(body)
+	EvilHeadcrab.Free(body)
 	body.EvilBond = nil
 	for i = 0, body:GetPhysicsObjectCount() - 1 do
 		local phys = body:GetPhysicsObjectNum(i)
@@ -138,8 +139,11 @@ end
 hook.Add("Think", "EvilHeadcrabPull", function()
 	local dt = FrameTime()
 	for barnacle, pull in pairs(pulls) do
-		if not IsValid(barnacle) or barnacle.EvilBond ~= pull.body or Pull(barnacle, pull, dt) then
+		if not IsValid(barnacle) or barnacle.EvilBond ~= pull.body then
 			pulls[barnacle] = nil
+		elseif Pull(barnacle, pull, dt) then
+			pulls[barnacle] = nil
+			EvilHeadcrab.Seated(pull.body)
 		end
 	end
 end)
@@ -158,6 +162,7 @@ function EvilHeadcrab.Bond(barnacle, body, head, health, crab)
 	local start = CurTime()
 	if barnacle:GetSequence() == eat then start = start - barnacle:GetCycle() * EAT_LENGTH / rate end
 	pulls[barnacle] = { body = body, phys = phys, crab = crab, start = start, rate = rate }
+	EvilHeadcrab.Hold(barnacle, body, IsValid(crab) and crab.prey)
 end
 
 function EvilHeadcrab.Unbond(barnacle, attacker)

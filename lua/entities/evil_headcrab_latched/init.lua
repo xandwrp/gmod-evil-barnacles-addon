@@ -48,6 +48,9 @@ local WAYPOINT = 24
 local UNDER = 10
 local OFFER_WAIT = 8
 local DROP_FIND = 4096
+local SPIRIT_MIN = 0.25
+local FIGHT = 0.25
+local EFFORT = { run = 1, circle = 1, pry = 0.5 }
 local HUNCH = {
 	["ValveBiped.Bip01_Spine"] = Angle(0, 2, 0),
 	["ValveBiped.Bip01_Spine1"] = Angle(0, 3, 0),
@@ -117,6 +120,9 @@ function ENT:Grab(v)
 		return false
 	end
 	self.seed = math.Rand(0, 100)
+	self.spirit = math.Rand(SPIRIT_MIN, 1)
+	self.fought = 0
+	v:SetNW2Float("EvilCrabSpirit", self.spirit)
 	self.start = CurTime()
 	self.done = self.start + (EvilHeadcrab.Settings:Get("instant_capture") ~= 0 and 0 or EvilHeadcrab.Settings:Get("capture_time"))
 	self.beatEnd = 0
@@ -230,8 +236,9 @@ end
 
 function ENT:Struggle(now, dt)
 	local p = (now - self.start) / (self.done - self.start)
-	local i = EvilHeadcrab.Intensity(p)
+	local i = EvilHeadcrab.Intensity(p) * self.spirit
 	if now >= self.beatEnd then self:Beat(p, i) end
+	self.fought = self.fought + (EFFORT[self.mode] or 0) * i * dt
 	if self.mode == "circle" then self.heading = self.heading + self.spin * dt end
 	self.swerve = self.swerve + dt * Lerp(i, SWERVE_HZ_SLOW, SWERVE_HZ_FAST) * math.pi * 2
 	local swerve = (math.sin(self.swerve) + 0.4 * math.sin(self.swerve * 2.3 + self.seed)) * Lerp(i, SWERVE_SLOW, SWERVE_FAST)
@@ -275,6 +282,7 @@ function ENT:ZoneOut(now)
 			v:ManipulateBoneAngles(b, s.base + s.add * k)
 		end
 	end
+	if self.lifted and self.prey and self.prey.fighter then return end
 	local k = math.ease.InOutSine(z.k)
 	local face = self.lifted and self.lifted.body or v
 	for i, s in pairs(z.flexes) do
@@ -288,7 +296,7 @@ function ENT:ZoneOut(now)
 end
 
 function ENT:Lure(now, dt)
-	if self.lifted then return self:Ride() end
+	if self.lifted then return self:Ride(now, dt) end
 	if self.offer then return self:Offer(now) end
 	if self.lure then return self:Seek(now, dt) end
 	if now < (self.nextLure or 0) then return end
@@ -385,24 +393,32 @@ function ENT:Seat(ent)
 	self:SetLocalAngles(SEAT)
 end
 
+function ENT:Fighter()
+	local span = self.done - self.start
+	return span > 0 and self.fought / span >= FIGHT
+end
+
 function ENT:Grabbed(b, body)
 	self.offer = nil
 	self.lifted = { barnacle = b, body = body }
+	self.prey = EvilHeadcrab.Prey(body, b, self:Fighter())
 	self:Seat(body)
 end
 
-function ENT:Ride()
+function ENT:Ride(now, dt)
 	local l = self.lifted
 	local b = l.barnacle
 	if not IsValid(b) or b:Health() <= 0 or not IsValid(l.body) or b:GetInternalVariable("m_hRagdoll") ~= l.body then
 		return self:Dropped()
 	end
-	if not b:GetInternalVariable("m_bLiftingPrey") then self:Transfer() end
+	if not b:GetInternalVariable("m_bLiftingPrey") then return self:Transfer() end
+	EvilHeadcrab.Thrash(self.prey, now, dt)
 end
 
 function ENT:Dropped()
 	local b, v = self.lifted.barnacle, self.victim
 	self.lifted = nil
+	self.prey = nil
 	if IsValid(b) then
 		if b.EvilThrall == self then b.EvilThrall = nil end
 		self.skip[b] = CurTime() + SKIP_FOR
