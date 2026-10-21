@@ -1,6 +1,17 @@
 local FLOOR = 4096
 local CLIMB = 18
 local SEARCH_LIMIT = 4000
+local EAT_LENGTH = 145 / 30
+local BITE_CYCLE = 0.16
+local SOCKET = -27.8
+local YANK = 900
+local STRIKE = {
+	-33.2, -33.2, -34.9, -38.3, -39.7, -40.6, -71.1, -63.7, -61.6, -60.6, -60.0, -59.2, -57.2,
+	-53.5, -48.2, -42.5, -38.7, -37.4, -36.7, -36.1, -35.5, -34.9, -34.2, -33.4, -32.4, -30.4,
+	-27.9, -24.9, -21.5, -18.0, -14.3, -10.7, -9.5, -9.2, -9.1, -9.1, -9.1,
+}
+
+local pulls = {}
 
 function EvilHeadcrab.Below(barnacle)
 	local start = barnacle:GetPos()
@@ -91,7 +102,49 @@ local function Unpin(body)
 	end
 end
 
-function EvilHeadcrab.Bond(barnacle, body, head, health)
+local function Eat(pull, barnacle)
+	pull.bitten = true
+	barnacle:EmitSound("NPC_Barnacle.FinalBite")
+	if IsValid(pull.crab) then
+		pull.crab:EmitSound("NPC_HeadCrab.Die")
+		pull.crab:Remove()
+	end
+end
+
+local function Strike(cycle)
+	local f = math.Clamp(cycle, 0, 1) * (#STRIKE - 1)
+	local i = math.floor(f)
+	return Lerp(f - i, STRIKE[i + 1], STRIKE[math.min(i + 2, #STRIKE)])
+end
+
+local function Pull(barnacle, pull, dt)
+	local phys = pull.phys
+	if not IsValid(phys) then return true end
+	local cycle = (CurTime() - pull.start) * pull.rate / EAT_LENGTH
+	if cycle < BITE_CYCLE then return end
+	local pos = phys:GetPos()
+	if not pull.bitten then
+		Eat(pull, barnacle)
+		pull.low = math.min(barnacle:WorldToLocal(pos).z, SOCKET)
+	end
+	local target = barnacle:LocalToWorld(Vector(0, 0, math.Clamp(Strike(cycle), pull.low, SOCKET)))
+	local gap = target - pos
+	local step = YANK * dt
+	local dist = gap:Length()
+	phys:SetPos(dist > step and pos + gap * (step / dist) or target)
+	return cycle >= 1 and dist <= step
+end
+
+hook.Add("Think", "EvilHeadcrabPull", function()
+	local dt = FrameTime()
+	for barnacle, pull in pairs(pulls) do
+		if not IsValid(barnacle) or barnacle.EvilBond ~= pull.body or Pull(barnacle, pull, dt) then
+			pulls[barnacle] = nil
+		end
+	end
+end)
+
+function EvilHeadcrab.Bond(barnacle, body, head, health, crab)
 	barnacle.EvilThrall = nil
 	barnacle.EvilBond, body.EvilBond = body, barnacle
 	body.EvilHealth = health
@@ -99,12 +152,19 @@ function EvilHeadcrab.Bond(barnacle, body, head, health)
 	if floor then barnacle:SetKeyValue("RestDist", tostring(barnacle:GetPos().z - floor.z)) end
 	local phys = body:GetPhysicsObjectNum(head)
 	if IsValid(phys) then phys:EnableMotion(false) end
-	barnacle:EmitSound("NPC_Barnacle.FinalBite")
+	local eat = barnacle:LookupSequence("eat_humanoid")
+	local rate = barnacle:GetPlaybackRate()
+	if rate <= 0 then rate = 1 end
+	local start = CurTime()
+	if barnacle:GetSequence() == eat then start = start - barnacle:GetCycle() * EAT_LENGTH / rate end
+	pulls[barnacle] = { body = body, phys = phys, crab = crab, start = start, rate = rate }
 end
 
 function EvilHeadcrab.Unbond(barnacle, attacker)
-	local body = barnacle.EvilBond
+	local body, pull = barnacle.EvilBond, pulls[barnacle]
 	barnacle.EvilBond = nil
+	pulls[barnacle] = nil
+	if pull and not pull.bitten then Eat(pull, barnacle) end
 	if IsValid(body) then Unpin(body) end
 	if barnacle:Health() > 0 then EvilHeadcrab.Kill(barnacle, attacker) end
 end

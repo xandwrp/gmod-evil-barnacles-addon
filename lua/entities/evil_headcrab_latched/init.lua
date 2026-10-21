@@ -422,14 +422,18 @@ function ENT:Transfer()
 	local health = math.max(v:GetMaxHealth(), 1)
 	b:Input("LetGo")
 	local freed = not IsValid(b:GetInternalVariable("m_hRagdoll"))
-	if freed then self.lifted = nil end
-	self:EmitSound("NPC_HeadCrab.Die")
-	self:Release()
-	if freed then
-		v:Remove()
-		EvilHeadcrab.Bond(b, body, head, health)
+	if not freed then
+		self:EmitSound("NPC_HeadCrab.Die")
+		self:Release()
+		self:Remove()
+		return
 	end
-	self:Remove()
+	self.lifted = nil
+	self.dead = true
+	self:Release()
+	self:SetNotSolid(true)
+	v:Remove()
+	EvilHeadcrab.Bond(b, body, head, health, self)
 end
 
 function ENT:Think()
