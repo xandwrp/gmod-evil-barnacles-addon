@@ -96,6 +96,7 @@ function ENT:Grab(v)
 	local head = v:LookupBone(EvilHeadcrab.HEAD)
 	if not head then return false end
 	self.victim = v
+	v.EvilCrab = self
 	self.pos = v:GetPos()
 	self.yaw = v:GetAngles().y
 	self.heading = self.yaw
@@ -455,14 +456,50 @@ function ENT:Think()
 		end
 		if self.thrall then
 			self:ZoneOut(now)
-			self:Lure(now, dt)
+			if self.held then
+				self:Carry()
+			else
+				self:Lure(now, dt)
+			end
 		end
 	end
 	self:NextThink(now)
 	return true
 end
 
+function ENT:Hold(ply)
+	if not self.thrall or self.lifted then return end
+	if self.lure then self:Abandon() end
+	if self.offer then self:Withdraw() end
+	local from = ply:GetShootPos()
+	local grab = ply:GetEyeTrace().HitPos
+	self.held = { ply = ply, dist = grab:Distance(from), offset = grab - self.pos }
+	ply.EvilCarrying = self
+	self:Play(self.idleSeq, ZONED_RATE, true)
+end
+
+function ENT:Carry()
+	local h = self.held
+	local ply = h.ply
+	if not IsValid(ply) or not ply:Alive() then return self:Drop() end
+	self.pos = ply:GetShootPos() + ply:GetAimVector() * h.dist - h.offset
+end
+
+function ENT:Drop()
+	local h = self.held
+	self.held = nil
+	if IsValid(h.ply) and h.ply.EvilCarrying == self then h.ply.EvilCarrying = nil end
+	self.nextLure = CurTime() + LURE_EVERY
+	local v = self.victim
+	if not IsValid(v) then return end
+	local filter = function(ent) return ent ~= v and ent ~= self end
+	local up = self.pos + Vector(0, 0, STEP)
+	local tr = util.TraceHull({ start = up, endpos = up - Vector(0, 0, DROP_FIND), mins = v:OBBMins(), maxs = v:OBBMaxs(), filter = filter, mask = MASK_NPCSOLID })
+	if tr.Hit and not tr.StartSolid then self.pos = tr.HitPos end
+end
+
 function ENT:Release()
+	if self.held then self:Drop() end
 	local hold = self.lifted or self.offer or self.lure
 	local lifted = self.lifted ~= nil
 	self.lifted, self.offer, self.lure = nil, nil, nil
@@ -470,6 +507,7 @@ function ENT:Release()
 	local v = self.victim
 	self.victim = nil
 	if not IsValid(v) then return end
+	v.EvilCrab = nil
 	local z = self.zoned
 	if z then
 		for b, s in pairs(z.bones) do v:ManipulateBoneAngles(b, s.base) end
@@ -536,3 +574,24 @@ end
 function ENT:OnRemove()
 	self:Release()
 end
+
+local wheelSpeed = GetConVar("physgun_wheelspeed")
+
+hook.Add("OnPhysgunPickup", "EvilHeadcrabCarry", function(ply, ent)
+	local crab = ent.EvilCrab
+	if IsValid(crab) then crab:Hold(ply) end
+end)
+
+hook.Add("PhysgunDrop", "EvilHeadcrabCarry", function(ply, ent)
+	local crab = ent.EvilCrab
+	if IsValid(crab) and crab.held and crab.held.ply == ply then crab:Drop() end
+end)
+
+hook.Add("StartCommand", "EvilHeadcrabCarry", function(ply, cmd)
+	local crab = ply.EvilCarrying
+	if not IsValid(crab) or not crab.held then return end
+	local wheel = cmd:GetMouseWheel()
+	if wheel ~= 0 then
+		crab.held.dist = math.max(crab.held.dist + wheel * (wheelSpeed and wheelSpeed:GetFloat() or 10), 0)
+	end
+end)
