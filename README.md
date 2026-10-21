@@ -8,7 +8,7 @@
 
 ## Spawning
 
-Entities > Syhgma's Evil Entities > Evil headcrab.
+Entities > Syhgma's Evil Entities > Evil headcrab or Evil barnacle. The barnacle goes on the ceiling above wherever you aim.
 
 ## What it does
 
@@ -17,6 +17,8 @@ Entities > Syhgma's Evil Entities > Evil headcrab.
 - Whoever it lands on panics, runs around blind and tries to pry it off, then slowly loses it
 - Once it has them they stand there zoned out, slightly hunched with their mouth hanging open and eyes rolled back
 - Shoot it off to let them go
+
+The evil barnacle is a normal barnacle for now.
 
 ## Settings
 
