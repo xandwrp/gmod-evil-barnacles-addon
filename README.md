@@ -16,9 +16,9 @@ Entities > Syhgma's Evil Entities > Evil headcrab or Evil barnacle. The barnacle
 - Leaps onto NPCs' heads
 - Whoever it lands on panics, runs around blind and tries to pry it off, then slowly loses it
 - Once it has them they stand there zoned out, slightly hunched with their mouth hanging open and eyes rolled back
-- If there's an evil barnacle nearby they shamble over to it and walk right under it
-- It pulls them up and sockets their head in, eating the headcrab. There's no getting them back after that
-- The barnacle can't be hurt while it's wearing someone. Kill the body and the barnacle dies with it
+- If there's an evil barnacle nearby they shamble over to it and stand under its tongue
+- It hauls them up like anything else, but at the mouth it eats the headcrab instead and keeps them hanging by the head. They're gone after that
+- The barnacle can't be hurt while it's wearing someone. Kill the body and the barnacle dies and drops it
 - Shoot the headcrab off before it gets them to a barnacle to let them go
 
 Otherwise the evil barnacle is a normal barnacle.

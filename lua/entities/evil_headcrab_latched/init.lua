@@ -46,10 +46,8 @@ local WALK_RATE = 0.6
 local WALK_TURN = 90
 local WAYPOINT = 24
 local UNDER = 10
-local LIFT_SPEED = 40
-local LIFT_SHIFT = 60
-local SNAP = 4
-local HANG_PULL = 10
+local OFFER_WAIT = 8
+local DROP_FIND = 4096
 local HUNCH = {
 	["ValveBiped.Bip01_Spine"] = Angle(0, 2, 0),
 	["ValveBiped.Bip01_Spine1"] = Angle(0, 3, 0),
@@ -124,9 +122,7 @@ function ENT:Grab(v)
 	self.last = self.start
 	v:SetNW2Float("EvilCrabbed", self.start)
 	v:SetNW2Float("EvilCrabDone", self.done)
-	self:FollowBone(v, head)
-	self:SetLocalPos(vector_origin)
-	self:SetLocalAngles(SEAT)
+	self:Seat(v)
 	if self.done > self.start then
 		self:Cling("headcrabbed", CLING / (self.done - self.start))
 	else
@@ -137,7 +133,7 @@ function ENT:Grab(v)
 end
 
 function ENT:EvilPose()
-	if self.pos then return self.pos, Angle(0, self.yaw, 0) end
+	if self.pos and not self.lifted then return self.pos, Angle(0, self.yaw, 0) end
 end
 
 function ENT:Play(seq, rate, loop, cycle)
@@ -279,19 +275,20 @@ function ENT:ZoneOut(now)
 		end
 	end
 	local k = math.ease.InOutSine(z.k)
+	local face = self.lifted and self.lifted.body or v
 	for i, s in pairs(z.flexes) do
-		v:SetFlexWeight(i, Lerp(k, s.base, s.to))
+		face:SetFlexWeight(i, Lerp(k, s.base, s.to))
 	end
-	local eyes = v:GetAttachment(v:LookupAttachment("eyes"))
+	local eyes = face:GetAttachment(face:LookupAttachment("eyes"))
 	if eyes then
 		local fwd, up = eyes.Ang:Forward(), eyes.Ang:Up()
-		v:SetEyeTarget(eyes.Pos + LerpVector(k, fwd, up - fwd * EYES_BACK) * EYES_REACH)
+		face:SetEyeTarget(eyes.Pos + LerpVector(k, fwd, up - fwd * EYES_BACK) * EYES_REACH)
 	end
 end
 
 function ENT:Lure(now, dt)
-	if self.socket then return self:Hang(dt) end
-	if self.lifting then return self:Lift(dt) end
+	if self.lifted then return self:Ride() end
+	if self.offer then return self:Offer(now) end
 	if self.lure then return self:Seek(now, dt) end
 	if now < (self.nextLure or 0) then return end
 	self.nextLure = now + LURE_EVERY
@@ -328,7 +325,7 @@ function ENT:Seek(now, dt)
 	flat.z = 0
 	local dist = flat:Length()
 	if dist < (last and UNDER or WAYPOINT) then
-		if last then return self:StartLift() end
+		if last then return self:Present() end
 		l.i = l.i + 1
 		l.best = math.huge
 		l.progress = now
@@ -354,61 +351,85 @@ function ENT:Seek(now, dt)
 	if to then self.pos = to end
 end
 
-function ENT:StartLift()
-	local b = self.lure.barnacle
+function ENT:Present()
+	local b, v = self.lure.barnacle, self.victim
 	self.lure = nil
-	self.lifting = b
+	self.offer = { barnacle = b, ends = CurTime() + OFFER_WAIT }
 	self:Play(self.idleSeq, ZONED_RATE, true)
-	b:EmitSound("NPC_Barnacle.TongueStretch")
+	b:AddEntityRelationship(v, D_HT, 99)
+	v:RemoveFlags(FL_NOTARGET)
 end
 
-function ENT:HeadGap(b)
-	local v = self.victim
-	local head = v:GetBonePosition(v:LookupBone(EvilHeadcrab.HEAD))
-	return EvilHeadcrab.Socket(b) - head
-end
-
-function ENT:Lift(dt)
-	local b = self.lifting
-	if not IsValid(b) or b:Health() <= 0 then
-		self.lifting = nil
-		return
+function ENT:Withdraw(skip)
+	local o = self.offer
+	self.offer = nil
+	if IsValid(o.barnacle) then
+		if o.barnacle.EvilThrall == self then o.barnacle.EvilThrall = nil end
+		if skip then self.skip[o.barnacle] = CurTime() + SKIP_FOR end
 	end
-	local gap = self:HeadGap(b)
-	if gap:Length() < SNAP then return self:Socket(b) end
-	local want = self.pos + gap
-	self.pos = Vector(
-		math.Approach(self.pos.x, want.x, LIFT_SHIFT * dt),
-		math.Approach(self.pos.y, want.y, LIFT_SHIFT * dt),
-		math.Approach(self.pos.z, want.z, LIFT_SPEED * dt)
-	)
+	self.victim:AddFlags(FL_NOTARGET)
 end
 
-function ENT:Socket(b)
-	local v = self.victim
-	self.lifting = nil
-	self.socket = b
-	self.consumed = true
-	b.EvilThrall = self
-	b.EvilSocketed = v
-	v.EvilSocket = b
-	self:SetNoDraw(true)
-	self:SetNotSolid(true)
+function ENT:Offer(now)
+	local b, v = self.offer.barnacle, self.victim
+	if not IsValid(b) or b:Health() <= 0 then return self:Withdraw() end
+	local body = b:GetInternalVariable("m_hRagdoll")
+	if b:GetEnemy() == v and IsValid(body) then return self:Grabbed(b, body) end
+	if now > self.offer.ends then return self:Withdraw(true) end
+end
+
+function ENT:Seat(ent)
+	self:FollowBone(ent, ent:LookupBone(EvilHeadcrab.HEAD))
+	self:SetLocalPos(vector_origin)
+	self:SetLocalAngles(SEAT)
+end
+
+function ENT:Grabbed(b, body)
+	self.offer = nil
+	self.lifted = { barnacle = b, body = body }
+	self:Seat(body)
+end
+
+function ENT:Ride()
+	local l = self.lifted
+	local b = l.barnacle
+	if not IsValid(b) or b:Health() <= 0 or not IsValid(l.body) or b:GetInternalVariable("m_hRagdoll") ~= l.body then
+		return self:Dropped()
+	end
+	if not b:GetInternalVariable("m_bLiftingPrey") then self:Transfer() end
+end
+
+function ENT:Dropped()
+	local b, v = self.lifted.barnacle, self.victim
+	self.lifted = nil
+	if IsValid(b) then
+		if b.EvilThrall == self then b.EvilThrall = nil end
+		self.skip[b] = CurTime() + SKIP_FOR
+	end
+	v:AddFlags(FL_NOTARGET)
+	self:Seat(v)
+	local start = v:GetPos()
+	local tr = util.TraceLine({ start = start, endpos = start - Vector(0, 0, DROP_FIND), mask = MASK_NPCSOLID_BRUSHONLY })
+	self.pos = tr.HitPos
+	self.yaw = v:GetAngles().y
+	self:Play(self.idleSeq, ZONED_RATE, true)
+end
+
+function ENT:Transfer()
+	local l = self.lifted
+	local b, body, v = l.barnacle, l.body, self.victim
+	local head = body:TranslateBoneToPhysBone(body:LookupBone(EvilHeadcrab.HEAD))
+	local health = math.max(v:GetMaxHealth(), 1)
+	b:Input("LetGo")
+	local freed = not IsValid(b:GetInternalVariable("m_hRagdoll"))
+	if freed then self.lifted = nil end
 	self:EmitSound("NPC_HeadCrab.Die")
-	b:EmitSound("NPC_Barnacle.FinalBite")
-end
-
-function ENT:Hang(dt)
-	local b = self.socket
-	if not IsValid(b) or b:Health() <= 0 then return self:Sever() end
-	self.pos = self.pos + self:HeadGap(b) * math.min(HANG_PULL * dt, 1)
-end
-
-function ENT:Sever()
-	local v = self.victim
-	self.socket = nil
-	v.EvilSocket = nil
-	EvilHeadcrab.Kill(v)
+	self:Release()
+	if freed then
+		v:Remove()
+		EvilHeadcrab.Bond(b, body, head, health)
+	end
+	self:Remove()
 end
 
 function ENT:Think()
@@ -418,11 +439,7 @@ function ENT:Think()
 	local v = self.victim
 	if v then
 		if not IsValid(v) or v:Health() <= 0 or Evil.Owner(v) ~= self then
-			if self.consumed then
-				self:Remove()
-			else
-				self:FallOff()
-			end
+			self:FallOff()
 			return
 		end
 		if not self.thrall then
@@ -442,14 +459,13 @@ function ENT:Think()
 end
 
 function ENT:Release()
-	local b = self.socket or self.lifting or (self.lure and self.lure.barnacle)
-	self.socket, self.lifting, self.lure = nil, nil, nil
-	if IsValid(b) and b.EvilThrall == self then b.EvilThrall = nil end
-	if self.consumed then EvilHeadcrab.Wither(b) end
+	local hold = self.lifted or self.offer or self.lure
+	local lifted = self.lifted ~= nil
+	self.lifted, self.offer, self.lure = nil, nil, nil
+	if hold and IsValid(hold.barnacle) and hold.barnacle.EvilThrall == self then hold.barnacle.EvilThrall = nil end
 	local v = self.victim
 	self.victim = nil
 	if not IsValid(v) then return end
-	v.EvilSocket = nil
 	local z = self.zoned
 	if z then
 		for b, s in pairs(z.bones) do v:ManipulateBoneAngles(b, s.base) end
@@ -460,7 +476,10 @@ function ENT:Release()
 	v:SetNW2Float("EvilCrabbed", 0)
 	v:SetNW2Float("EvilCrabDone", 0)
 	if Evil.Owner(v) == self then Evil.Unpose(v, self) end
-	if self.consumed and v:Health() > 0 then EvilHeadcrab.Kill(v) end
+	if lifted then
+		v:SetNoDraw(true)
+		v:SetNotSolid(true)
+	end
 end
 
 function ENT:Handover(ent)
@@ -484,7 +503,7 @@ function ENT:FallOff()
 end
 
 function ENT:OnTakeDamage(dmg)
-	if self.dead or self.consumed then return end
+	if self.dead then return end
 	self:SetHealth(self:Health() - dmg:GetDamage())
 	if self:Health() > 0 then
 		self:EmitSound("NPC_HeadCrab.Pain")

@@ -1,12 +1,6 @@
 local FLOOR = 4096
 local CLIMB = 18
 local SEARCH_LIMIT = 4000
-local SOCKET_DROP = 60
-
-function EvilHeadcrab.Socket(barnacle)
-	local a = barnacle:GetAttachment(barnacle:LookupAttachment("StrikeHeadAttach"))
-	return a and a.Pos or barnacle:GetPos() - Vector(0, 0, SOCKET_DROP)
-end
 
 function EvilHeadcrab.Below(barnacle)
 	local start = barnacle:GetPos()
@@ -17,7 +11,7 @@ end
 function EvilHeadcrab.FreeBarnacle(pos, range, skip)
 	local now, best, bestDist, bestSpot = CurTime()
 	for _, b in ipairs(ents.FindByClass("npc_barnacle")) do
-		if b.EvilBarnacle and b:Health() > 0 and not IsValid(b.EvilThrall) and (skip[b] or 0) < now then
+		if b.EvilBarnacle and b:Health() > 0 and not IsValid(b.EvilThrall) and not IsValid(b.EvilBond) and (skip[b] or 0) < now then
 			local spot = EvilHeadcrab.Below(b)
 			local dist = spot and pos:DistToSqr(spot)
 			if dist and dist < range * range and (not best or dist < bestDist) then
@@ -86,19 +80,49 @@ function EvilHeadcrab.Kill(ent, attacker)
 	ent:TakeDamageInfo(dmg)
 end
 
-function EvilHeadcrab.Wither(barnacle, attacker)
-	if not IsValid(barnacle) then return end
-	barnacle.EvilSocketed = nil
+local function Unpin(body)
+	body.EvilBond = nil
+	for i = 0, body:GetPhysicsObjectCount() - 1 do
+		local phys = body:GetPhysicsObjectNum(i)
+		if IsValid(phys) then
+			phys:EnableMotion(true)
+			phys:Wake()
+		end
+	end
+end
+
+function EvilHeadcrab.Bond(barnacle, body, head, health)
 	barnacle.EvilThrall = nil
+	barnacle.EvilBond, body.EvilBond = body, barnacle
+	body.EvilHealth = health
+	local floor = EvilHeadcrab.Below(barnacle)
+	if floor then barnacle:SetKeyValue("RestDist", tostring(barnacle:GetPos().z - floor.z)) end
+	local phys = body:GetPhysicsObjectNum(head)
+	if IsValid(phys) then phys:EnableMotion(false) end
+	barnacle:EmitSound("NPC_Barnacle.FinalBite")
+end
+
+function EvilHeadcrab.Unbond(barnacle, attacker)
+	local body = barnacle.EvilBond
+	barnacle.EvilBond = nil
+	if IsValid(body) then Unpin(body) end
 	if barnacle:Health() > 0 then EvilHeadcrab.Kill(barnacle, attacker) end
 end
 
-hook.Add("EntityTakeDamage", "EvilHeadcrabSocket", function(ent)
-	if IsValid(ent.EvilSocketed) then return true end
+hook.Add("EntityTakeDamage", "EvilHeadcrabBond", function(ent, dmg)
+	local other = ent.EvilBond
+	if not IsValid(other) then return end
+	if ent:IsNPC() then return true end
+	ent.EvilHealth = ent.EvilHealth - dmg:GetDamage()
+	if ent.EvilHealth <= 0 then EvilHeadcrab.Unbond(other, dmg:GetAttacker()) end
 end)
 
-hook.Add("OnNPCKilled", "EvilHeadcrabSocket", function(npc, attacker)
-	local b = npc.EvilSocket
-	npc.EvilSocket = nil
-	if IsValid(b) and b.EvilSocketed == npc then EvilHeadcrab.Wither(b, attacker) end
+hook.Add("EntityRemoved", "EvilHeadcrabBond", function(ent)
+	local other = ent.EvilBond
+	if not IsValid(other) then return end
+	if ent:IsNPC() then
+		Unpin(other)
+	else
+		EvilHeadcrab.Unbond(other)
+	end
 end)
