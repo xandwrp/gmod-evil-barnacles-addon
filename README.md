@@ -24,3 +24,4 @@ Spawn menu > Utilities > Syhgma's Evil Entities > Evil headcrabs (superadmins), 
 
 - Targets NPCs
 - Capture time, how many seconds a victim struggles before it has them
+- Instantly capture victims, skips the struggle and greys out capture time

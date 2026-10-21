@@ -81,7 +81,7 @@ function ENT:Grab(v)
 	end
 	self.seed = math.Rand(0, 100)
 	self.start = CurTime()
-	self.done = self.start + EvilHeadcrab.Settings:Get("capture_time")
+	self.done = self.start + (EvilHeadcrab.Settings:Get("instant_capture") ~= 0 and 0 or EvilHeadcrab.Settings:Get("capture_time"))
 	self.beatEnd = 0
 	self.last = self.start
 	v:SetNW2Float("EvilCrabbed", self.start)
@@ -89,7 +89,11 @@ function ENT:Grab(v)
 	self:FollowBone(v, head)
 	self:SetLocalPos(vector_origin)
 	self:SetLocalAngles(SEAT)
-	self:Cling("headcrabbed", CLING / (self.done - self.start))
+	if self.done > self.start then
+		self:Cling("headcrabbed", CLING / (self.done - self.start))
+	else
+		self:Enthrall()
+	end
 	self:EmitSound("NPC_HeadCrab.Bite")
 	return true
 end
