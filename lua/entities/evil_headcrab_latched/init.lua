@@ -348,6 +348,7 @@ end
 function ENT:Dropped()
 	local b, v = self.lifted.barnacle, self.victim
 	self.lifted = nil
+	EvilHeadcrab.Calm(self.prey)
 	self.prey = nil
 	if IsValid(b) then
 		if b.EvilThrall == self then b.EvilThrall = nil end

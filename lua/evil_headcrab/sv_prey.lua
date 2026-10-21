@@ -7,7 +7,9 @@ local SWALLOW = 22
 local GULPS = 3
 local KICK = 10
 local FADE = 8
-local CLAW_UP, CLAW_SPREAD = 6, 9
+local CLAW_UP = 6
+local CLAW_IN, CLAW_OUT = 5, 11
+local LIP, YANK = -30, 8
 local CLAW_K, CLAW_DAMP = 70, 9
 local CLAW_MIN, CLAW_MAX = 0.2, 0.55
 local REEL_K, REEL_DAMP, REEL_IN = 120, 12, 0.8
@@ -37,8 +39,8 @@ local PLEAD = { "help01", "no01", "no02", "ohno", "startle01", "startle02", "pai
 local SHRIEK = { "pain07", "pain08", "pain09", "no02" }
 local MOAN = { "moan01", "moan02", "moan03", "moan04", "moan05" }
 local SIDES = {
-	{ hand = "ValveBiped.Bip01_R_Hand", foot = "ValveBiped.Bip01_R_Foot", thigh = "ValveBiped.Bip01_R_Thigh", net = "EvilLatchR", phase = 0, out = -1 },
-	{ hand = "ValveBiped.Bip01_L_Hand", foot = "ValveBiped.Bip01_L_Foot", thigh = "ValveBiped.Bip01_L_Thigh", net = "EvilLatchL", phase = math.pi, out = 1 },
+	{ hand = "ValveBiped.Bip01_R_Hand", fore = "ValveBiped.Bip01_R_Forearm", upper = "ValveBiped.Bip01_R_UpperArm", foot = "ValveBiped.Bip01_R_Foot", thigh = "ValveBiped.Bip01_R_Thigh", net = "EvilLatchR", phase = 0, out = -1 },
+	{ hand = "ValveBiped.Bip01_L_Hand", fore = "ValveBiped.Bip01_L_Forearm", upper = "ValveBiped.Bip01_L_UpperArm", foot = "ValveBiped.Bip01_L_Foot", thigh = "ValveBiped.Bip01_L_Thigh", net = "EvilLatchL", phase = math.pi, out = 1 },
 }
 
 local held = {}
@@ -75,7 +77,18 @@ local function Flat(v, up)
 end
 
 local function Spring(phys, target, k, damp, dt)
+	phys:Wake()
 	phys:AddVelocity(((target - phys:GetPos()) * k - phys:GetVelocity() * damp) * dt)
+end
+
+local function Float(prey, on)
+	if prey.floating == on then return end
+	prey.floating = on
+	for _, side in ipairs(prey.sides) do
+		for _, phys in ipairs(side.arm) do
+			if IsValid(phys) then phys:EnableGravity(not on) end
+		end
+	end
 end
 
 function EvilHeadcrab.Prey(body, maw, fighter)
@@ -86,22 +99,35 @@ function EvilHeadcrab.Prey(body, maw, fighter)
 	}
 	for _, def in ipairs(SIDES) do
 		local side = { def = def, hand = Phys(body, def.hand), foot = Phys(body, def.foot), thigh = Phys(body, def.thigh), aim = Vector(), kick = Vector(), claw = 0, jolt = 0 }
+		side.arm = { side.hand, Phys(body, def.fore), Phys(body, def.upper) }
 		if side.hand and side.foot and side.thigh then prey.sides[#prey.sides + 1] = side end
 	end
 	prey.fighter = fighter and prey.head ~= nil and prey.pelvis ~= nil and #prey.sides == #SIDES
-	if prey.fighter then Face(body, PANIC_FACE) end
+	if prey.fighter then
+		Face(body, PANIC_FACE)
+		Float(prey, true)
+	end
 	return prey
 end
 
+function EvilHeadcrab.Calm(prey)
+	if prey then Float(prey, false) end
+end
+
 local function Claw(prey, now, dt, up)
-	local top = prey.head:GetPos() + up * CLAW_UP
+	local maw = prey.maw
+	local head = maw:WorldToLocal(prey.head:GetPos())
 	for _, side in ipairs(prey.sides) do
 		if not side.latched then
 			if now >= side.claw then
 				side.claw = now + math.Rand(CLAW_MIN, CLAW_MAX)
-				side.aim = Flat(VectorRand(), up) * CLAW_SPREAD
+				local a = math.Rand(0, math.pi * 2)
+				local r = math.Rand(CLAW_IN, CLAW_OUT)
+				side.aim = Vector(math.cos(a) * r, math.sin(a) * r, -math.Rand(0, YANK))
 			end
-			Spring(side.hand, top + side.aim, CLAW_K, CLAW_DAMP, dt)
+			local top = math.min(head.z + CLAW_UP, LIP)
+			local target = maw:LocalToWorld(Vector(head.x + side.aim.x, head.y + side.aim.y, top + side.aim.z))
+			Spring(side.hand, target, CLAW_K, CLAW_DAMP, dt)
 		end
 	end
 end
@@ -141,6 +167,7 @@ end
 local function Heave(prey, now, up)
 	if now < prey.heave then return end
 	prey.heave = now + math.Rand(HEAVE_MIN, HEAVE_MAX)
+	prey.pelvis:Wake()
 	prey.pelvis:AddVelocity(-up * HEAVE + Flat(VectorRand(), up) * (HEAVE * 0.4))
 end
 
@@ -158,6 +185,7 @@ end
 
 local function Limp(prey, now)
 	prey.limp = true
+	Float(prey, false)
 	prey.twitch = now + math.Rand(TWITCH_MIN, TWITCH_MAX)
 	prey.damping = {}
 	local body = prey.body
@@ -280,6 +308,7 @@ function EvilHeadcrab.Free(body)
 	local prey = held[body]
 	held[body] = nil
 	if not prey or not IsValid(body) then return end
+	Float(prey, false)
 	for i, d in pairs(prey.damping or {}) do
 		local phys = body:GetPhysicsObjectNum(i)
 		if IsValid(phys) then phys:SetDamping(d[1], d[2]) end
