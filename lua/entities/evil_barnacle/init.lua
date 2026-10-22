@@ -22,6 +22,6 @@ function ENT:SpawnFunction(ply, tr)
 	barnacle:SetAngles(Angle(0, ply:EyeAngles().y + 180, 0))
 	barnacle:Spawn()
 	barnacle:Activate()
-	barnacle.EvilBarnacle = true
+	EvilBarnacle.Add(barnacle)
 	return barnacle
 end

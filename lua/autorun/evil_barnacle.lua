@@ -54,4 +54,5 @@ include("evil_barnacle/sh_settings.lua")
 if SERVER then
 	include("evil_barnacle/sv_prey.lua")
 	include("evil_barnacle/sv_barnacle.lua")
+	include("evil_barnacle/sv_catch.lua")
 end
