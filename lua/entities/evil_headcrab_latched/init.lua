@@ -137,6 +137,10 @@ function ENT:Play(seq, rate, loop, cycle)
 	if not cycle and seq == v:GetSequence() then cycle = v:GetCycle() end
 	Evil.Pose(v, self, { sequence = seq, rate = rate, loop = loop })
 	if cycle then v:SetCycle(cycle) end
+	if v:IsPlayer() then
+		v:SetNW2Bool("EvilCrabRunning", seq == self.runSeq)
+		v:SetNW2Float("EvilCrabRate", rate or 1)
+	end
 end
 
 function ENT:SavePry()
@@ -447,6 +451,7 @@ function ENT:Think()
 			end
 			if self.victim then self:Struggle(now, dt, self.held ~= nil) end
 		end
+		if IsValid(self.victim) and self.victim:IsPlayer() then self.victim:SetNW2Float("EvilCrabYaw", self.yaw) end
 	end
 	self:NextThink(now)
 	return true
@@ -495,6 +500,7 @@ function ENT:Release()
 	v.EvilCrab = nil
 	v:SetNW2Float("EvilCrabbed", 0)
 	v:SetNW2Float("EvilCrabDone", 0)
+	v:SetNW2Bool("EvilCrabRunning", false)
 	if Evil.Owner(v) == self then Evil.Unpose(v, self) end
 	if lifted then
 		v:SetNoDraw(true)
