@@ -20,7 +20,7 @@ Entities > Syhgma's Evil Entities > Evil headcrab or Evil barnacle. The barnacle
 - The barnacle hauls them up, eats the headcrab at the mouth and keeps them. They claw at it and kick for a while, then go limp
 - The barnacle can't be hurt while it's wearing someone. Kill the body and the barnacle dies and drops it
 - Shoot the headcrab off before it gets them to a barnacle to let them go
-- With players turned on it goes for them too. They get run around the same way and have to mash jump to pry it off. If it gets them to a barnacle, the barnacle takes it from there
+- With players turned on it goes for them too. They get run around the same way and have to mash jump to pry it off, even on the tongue. Make it to the mouth with it still on and the barnacle eats it and keeps them, like anyone else
 
 Otherwise the evil barnacle is a normal barnacle.
 

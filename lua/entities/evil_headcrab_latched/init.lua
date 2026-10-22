@@ -358,8 +358,10 @@ function ENT:Haul(b)
 	local v = self.victim
 	self.offer = nil
 	self.hauled = { barnacle = b }
-	self:Unresist(v)
 	Evil.Unpose(v, self)
+	v:SetNW2Bool("EvilCrabRoped", true)
+	v:DrawViewModel(false)
+	v:DrawWorldModel(false)
 end
 
 function ENT:Hang()
@@ -369,10 +371,62 @@ function ENT:Hang()
 	if b:GetInternalVariable("m_bLiftingPrey") then
 		h.rising = true
 	elseif h.rising then
+		self:Socket()
+	end
+end
+
+local function Corpse(v)
+	local model = v:GetModel()
+	if not model or not util.IsValidRagdoll(model) then return end
+	local body = ents.Create("prop_ragdoll")
+	if not IsValid(body) then return end
+	body:SetModel(model)
+	body:SetPos(v:GetPos())
+	body:SetAngles(Angle(0, v:GetAngles().y, 0))
+	body:SetSkin(v:GetSkin())
+	for i = 0, v:GetNumBodyGroups() - 1 do body:SetBodygroup(i, v:GetBodygroup(i)) end
+	body:SetMaterial(v:GetMaterial())
+	body:SetColor(v:GetColor())
+	body:SetNW2Vector("EvilColor", v:GetPlayerColor())
+	body:Spawn()
+	body:Activate()
+	local bone = body:LookupBone(EvilHeadcrab.HEAD)
+	local head = bone and body:TranslateBoneToPhysBone(bone)
+	if not head or head < 0 then
+		body:Remove()
+		return
+	end
+	for i = 0, body:GetPhysicsObjectCount() - 1 do
+		local phys = body:GetPhysicsObjectNum(i)
+		local m = IsValid(phys) and v:GetBoneMatrix(body:TranslatePhysBoneToBone(i))
+		if m then
+			phys:SetPos(m:GetTranslation(), true)
+			phys:SetAngles(m:GetAngles())
+			phys:Wake()
+		end
+	end
+	return body, head
+end
+
+function ENT:Socket()
+	local b, v = self.hauled.barnacle, self.victim
+	b:Input("LetGo")
+	local body, head = Corpse(v)
+	if not body then
 		self:EmitSound("NPC_HeadCrab.Die")
 		self:Release()
 		self:Remove()
+		return
 	end
+	local health = math.max(v:GetMaxHealth(), 1)
+	self.dead = true
+	self:Release()
+	self:SetNotSolid(true)
+	self:Seat(body)
+	self:Handover(body)
+	v.EvilSocket = body
+	v:KillSilent()
+	EvilHeadcrab.Bond(b, body, head, health, self)
 end
 
 function ENT:Ride(now, dt)
@@ -490,7 +544,7 @@ end
 function ENT:Release()
 	if self.held then self:Drop() end
 	local hold = self.lifted or self.offer or self.lure or self.hauled
-	local lifted = self.lifted ~= nil
+	local lifted, roped = self.lifted ~= nil, self.hauled ~= nil
 	self.lifted, self.offer, self.lure, self.hauled = nil, nil, nil, nil
 	if hold and IsValid(hold.barnacle) and hold.barnacle.EvilThrall == self then hold.barnacle.EvilThrall = nil end
 	local v = self.victim
@@ -501,6 +555,11 @@ function ENT:Release()
 	v:SetNW2Float("EvilCrabbed", 0)
 	v:SetNW2Float("EvilCrabDone", 0)
 	v:SetNW2Bool("EvilCrabRunning", false)
+	if roped then
+		v:SetNW2Bool("EvilCrabRoped", false)
+		v:DrawViewModel(true)
+		v:DrawWorldModel(true)
+	end
 	if Evil.Owner(v) == self then Evil.Unpose(v, self) end
 	if lifted then
 		v:SetNoDraw(true)
@@ -545,7 +604,9 @@ function ENT:PryOff()
 	local v, pos = self.victim, self:GetPos()
 	local yaw = self.yaw + 180 + math.Rand(-60, 60)
 	local throw = Angle(0, yaw, 0):Forward()
+	local hauled = self.hauled
 	self:Release()
+	if hauled and IsValid(hauled.barnacle) then hauled.barnacle:Input("LetGo") end
 	local crab = self:Shed(pos, yaw, throw * THROW + Vector(0, 0, THROW_UP), { [v] = CurTime() + SHUN })
 	crab:EmitSound("NPC_HeadCrab.Pain")
 	if IsValid(v) and v:IsNPC() then Flee(v, -throw) end
@@ -609,4 +670,22 @@ hook.Add("StartCommand", "EvilHeadcrabCarry", function(ply, cmd)
 	if wheel ~= 0 then
 		crab.held.dist = math.max(crab.held.dist + wheel * (wheelSpeed and wheelSpeed:GetFloat() or 10), 0)
 	end
+end)
+
+hook.Add("EntityTakeDamage", "EvilHeadcrabRoped", function(ent, dmg)
+	local crab = ent.EvilCrab
+	if not IsValid(crab) or not crab.hauled then return end
+	local b = crab.hauled.barnacle
+	if dmg:GetAttacker() == b or dmg:GetInflictor() == b or dmg:IsDamageType(DMG_CRUSH) then return true end
+end)
+
+hook.Add("PostPlayerDeath", "EvilHeadcrabSocket", function(ply)
+	local body = ply.EvilSocket
+	if not IsValid(body) then return end
+	ply:Spectate(OBS_MODE_CHASE)
+	ply:SpectateEntity(body)
+end)
+
+hook.Add("PlayerSpawn", "EvilHeadcrabSocket", function(ply)
+	ply.EvilSocket = nil
 end)
