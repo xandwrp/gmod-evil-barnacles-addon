@@ -19,7 +19,8 @@ local PRY_END = 0.4
 local STEP = 18
 local DROP = 48
 local CORPSE_PUSH = 150
-local RUNS = { ACT_RUN_PROTECTED, ACT_RUN_PANICKED, ACT_RUN, ACT_HL2MP_RUN_PANICKED, ACT_HL2MP_RUN_PROTECTED, ACT_HL2MP_RUN }
+local RUNS = { ACT_RUN_PROTECTED, ACT_RUN_PANICKED, ACT_RUN }
+local PLAYER_RUNS = { ACT_HL2MP_RUN_PANICKED, ACT_HL2MP_RUN_PROTECTED, ACT_HL2MP_RUN }
 local IDLES = { "idle_unarmed", "idle_subtle", "idle_all_scared" }
 local UNARMED_IDLES = {
 	["models/monk.mdl"] = "LineIdle01",
@@ -46,7 +47,7 @@ local function Valid(seq)
 end
 
 local function RunSequence(v)
-	for _, act in ipairs(RUNS) do
+	for _, act in ipairs(v:IsPlayer() and PLAYER_RUNS or RUNS) do
 		local seq = Valid(v:SelectWeightedSequence(act))
 		if seq then return seq end
 	end
