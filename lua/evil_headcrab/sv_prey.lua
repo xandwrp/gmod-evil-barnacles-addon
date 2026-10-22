@@ -1,19 +1,10 @@
-local PANIC = 10
-local CREEP_MIN, CREEP_MAX = 1.6, 2.4
-local STAGGER_MIN, STAGGER_MAX = 0.4, 1
-local SWALLOW_WAIT = 0.8
-local SWALLOW_TIME = 3.5
-local SWALLOW = 22
-local GULPS = 3
-local KICK = 10
+local PANIC = 20
 local FADE = 8
 local CLAW_UP = 6
 local CLAW_IN, CLAW_OUT = 5, 11
 local LIP, YANK = -30, 8
 local CLAW_K, CLAW_DAMP = 70, 9
 local CLAW_MIN, CLAW_MAX = 0.2, 0.55
-local REEL_K, REEL_DAMP, REEL_IN = 120, 12, 0.8
-local REEL_OUT, REEL_UP = 4, 3
 local LEG, LEG_OUT = 34, 4
 local STRIDE_HZ, STRIDE_REACH, STRIDE_LIFT = 1.3, 14, 10
 local LEG_K, LEG_DAMP = 40, 6
@@ -36,11 +27,10 @@ local PANIC_FACE = {
 	left_stretcher = 0.5,
 }
 local PLEAD = { "help01", "no01", "no02", "ohno", "startle01", "startle02", "pain07", "pain08", "pain09", "gethellout" }
-local SHRIEK = { "pain07", "pain08", "pain09", "no02" }
 local MOAN = { "moan01", "moan02", "moan03", "moan04", "moan05" }
 local SIDES = {
-	{ hand = "ValveBiped.Bip01_R_Hand", fore = "ValveBiped.Bip01_R_Forearm", upper = "ValveBiped.Bip01_R_UpperArm", foot = "ValveBiped.Bip01_R_Foot", thigh = "ValveBiped.Bip01_R_Thigh", net = "EvilLatchR", phase = 0, out = -1 },
-	{ hand = "ValveBiped.Bip01_L_Hand", fore = "ValveBiped.Bip01_L_Forearm", upper = "ValveBiped.Bip01_L_UpperArm", foot = "ValveBiped.Bip01_L_Foot", thigh = "ValveBiped.Bip01_L_Thigh", net = "EvilLatchL", phase = math.pi, out = 1 },
+	{ hand = "ValveBiped.Bip01_R_Hand", fore = "ValveBiped.Bip01_R_Forearm", upper = "ValveBiped.Bip01_R_UpperArm", foot = "ValveBiped.Bip01_R_Foot", thigh = "ValveBiped.Bip01_R_Thigh", phase = 0, out = -1 },
+	{ hand = "ValveBiped.Bip01_L_Hand", fore = "ValveBiped.Bip01_L_Forearm", upper = "ValveBiped.Bip01_L_UpperArm", foot = "ValveBiped.Bip01_L_Foot", thigh = "ValveBiped.Bip01_L_Thigh", phase = math.pi, out = 1 },
 }
 
 local held = {}
@@ -114,31 +104,19 @@ function EvilHeadcrab.Calm(prey)
 	if prey then Float(prey, false) end
 end
 
-local function Claw(prey, now, dt, up)
+local function Claw(prey, now, dt)
 	local maw = prey.maw
 	local head = maw:WorldToLocal(prey.head:GetPos())
 	for _, side in ipairs(prey.sides) do
-		if not side.latched then
-			if now >= side.claw then
-				side.claw = now + math.Rand(CLAW_MIN, CLAW_MAX)
-				local a = math.Rand(0, math.pi * 2)
-				local r = math.Rand(CLAW_IN, CLAW_OUT)
-				side.aim = Vector(math.cos(a) * r, math.sin(a) * r, -math.Rand(0, YANK))
-			end
-			local top = math.min(head.z + CLAW_UP, LIP)
-			local target = maw:LocalToWorld(Vector(head.x + side.aim.x, head.y + side.aim.y, top + side.aim.z))
-			Spring(side.hand, target, CLAW_K, CLAW_DAMP, dt)
+		if now >= side.claw then
+			side.claw = now + math.Rand(CLAW_MIN, CLAW_MAX)
+			local a = math.Rand(0, math.pi * 2)
+			local r = math.Rand(CLAW_IN, CLAW_OUT)
+			side.aim = Vector(math.cos(a) * r, math.sin(a) * r, -math.Rand(0, YANK))
 		end
-	end
-end
-
-local function Reel(prey, now, dt, up)
-	local head = prey.head:GetPos()
-	for _, side in ipairs(prey.sides) do
-		if side.latched then
-			local k = Lerp(math.min((now - side.latch) / REEL_IN, 1), 0.3, 1)
-			Spring(side.hand, head + side.out + up * REEL_UP, REEL_K * k, REEL_DAMP, dt)
-		end
+		local top = math.min(head.z + CLAW_UP, LIP)
+		local target = maw:LocalToWorld(Vector(head.x + side.aim.x, head.y + side.aim.y, top + side.aim.z))
+		Spring(side.hand, target, CLAW_K, CLAW_DAMP, dt)
 	end
 end
 
@@ -211,43 +189,9 @@ local function Twitch(prey, now)
 	if prey.fighter and math.random() < TWITCH_MOAN then Say(prey, MOAN, 55, math.random(72, 84), 0.35) end
 end
 
-local function Latch(prey, side, up)
-	side.latched = true
-	local out = Flat(side.hand:GetPos() - prey.head:GetPos(), up)
-	if out:LengthSqr() < 0.01 then out = prey.maw:GetRight() * side.def.out end
-	out:Normalize()
-	side.out = out * REEL_OUT
-	prey.body:EmitSound("physics/flesh/flesh_squishy_impact_hard" .. math.random(4) .. ".wav")
-	Say(prey, SHRIEK, 85, math.random(100, 112), 1)
-	prey.plead = CurTime() + PLEAD_MIN
-end
-
-local function Hunt(prey, now)
-	local body = prey.body
-	prey.hunt = now
-	body:SetNW2Float("EvilHunt", now)
-	local at = now + math.Rand(CREEP_MIN, CREEP_MAX)
-	local first = math.random(#prey.sides)
-	for n, side in ipairs(prey.sides) do
-		side.latch = n == first and at or at + math.Rand(STAGGER_MIN, STAGGER_MAX)
-		body:SetNW2Float(side.def.net, side.latch)
-	end
-	prey.maw:EmitSound("NPC_Barnacle.TongueStretch")
-end
-
-local function Swallow(prey, now)
-	if not prey.gulping then
-		prey.gulping = true
-		prey.maw:EmitSound("NPC_Barnacle.PullPant")
-	end
-	local s = math.min((now - prey.swallow) / SWALLOW_TIME, 1)
-	local f = s - math.sin(s * GULPS * math.pi * 2) / (GULPS * math.pi * 2)
-	prey.head:SetPos(prey.maw:LocalToWorld(prey.socket + Vector(0, 0, SWALLOW * f)))
-end
-
 local function Legs(prey, now)
-	if not prey.swallowed or now < prey.swallowed + KICK then return 1 end
-	local f = 1 - math.min((now - prey.swallowed - KICK) / FADE, 1)
+	local f = 1 - math.Clamp((now - prey.start - PANIC) / FADE, 0, 1)
+	if f >= 1 then return 1 end
 	if now >= prey.burst then
 		prey.burstEnd = now + math.Rand(0.4, 1.2) * (0.5 + f)
 		prey.burst = prey.burstEnd + math.Rand(0.6, 1.4) * Lerp(f, 3, 0.2)
@@ -256,35 +200,23 @@ local function Legs(prey, now)
 end
 
 local function Fight(prey, now, dt, up)
-	if not prey.hunt and prey.seated and now - prey.start >= PANIC then Hunt(prey, now) end
-	local all = prey.hunt ~= nil
-	for _, side in ipairs(prey.sides) do
-		if side.latch and not side.latched and now >= side.latch then Latch(prey, side, up) end
-		all = all and side.latched
-	end
-	if all and not prey.swallow then
-		prey.swallow = now + SWALLOW_WAIT
-		prey.swallowed = prey.swallow + SWALLOW_TIME
-	end
-	if prey.swallow and now >= prey.swallow then Swallow(prey, now) end
-	Claw(prey, now, dt, up)
-	Reel(prey, now, dt, up)
 	local k = Legs(prey, now)
 	Kick(prey, now, dt, up, k)
-	if not prey.swallow then
+	if now - prey.start < PANIC then
+		Claw(prey, now, dt)
 		Heave(prey, now, up)
 		Plead(prey, now)
-	elseif k > 0 then
-		Moan(prey, now)
+	else
+		Float(prey, false)
+		if k > 0 then Moan(prey, now) end
 	end
-	if prey.swallowed and now >= prey.swallowed + KICK + FADE then Limp(prey, now) end
+	if now - prey.start >= PANIC + FADE then Limp(prey, now) end
 end
 
 function EvilHeadcrab.Thrash(prey, now, dt)
 	if not prey or not prey.fighter or not IsValid(prey.maw) then return end
-	local up = prey.maw:GetUp()
-	Claw(prey, now, dt, up)
-	Kick(prey, now, dt, up, 1)
+	Claw(prey, now, dt)
+	Kick(prey, now, dt, prey.maw:GetUp(), 1)
 	Plead(prey, now)
 end
 
@@ -292,16 +224,11 @@ function EvilHeadcrab.Hold(maw, body, prey)
 	prey = prey or EvilHeadcrab.Prey(body, maw, false)
 	prey.maw = maw
 	held[body] = prey
-	body:SetNW2Entity("EvilMaw", maw)
 end
 
 function EvilHeadcrab.Seated(body)
 	local prey = held[body]
-	if not prey or not IsValid(prey.maw) or not IsValid(prey.head) then return end
-	local now = CurTime()
-	prey.seated = now
-	prey.socket = prey.maw:WorldToLocal(prey.head:GetPos())
-	if not prey.fighter then Limp(prey, now) end
+	if prey and not prey.fighter then Limp(prey, CurTime()) end
 end
 
 function EvilHeadcrab.Free(body)
@@ -313,9 +240,6 @@ function EvilHeadcrab.Free(body)
 		local phys = body:GetPhysicsObjectNum(i)
 		if IsValid(phys) then phys:SetDamping(d[1], d[2]) end
 	end
-	body:SetNW2Entity("EvilMaw", NULL)
-	body:SetNW2Float("EvilHunt", 0)
-	for _, def in ipairs(SIDES) do body:SetNW2Float(def.net, 0) end
 end
 
 hook.Add("Think", "EvilHeadcrabPrey", function()
