@@ -1,7 +1,7 @@
 if SERVER then resource.AddWorkshop("3823740816") end
 if not file.Exists("evil_api/init.lua", "LUA") then
 	EvilNeedsAPI = EvilNeedsAPI or {}
-	EvilNeedsAPI[#EvilNeedsAPI + 1] = "Evil headcrabs"
+	EvilNeedsAPI[#EvilNeedsAPI + 1] = "Evil barnacles"
 	if #EvilNeedsAPI > 1 then return end
 
 	local API = "3823740816"
@@ -49,15 +49,9 @@ if not file.Exists("evil_api/init.lua", "LUA") then
 end
 include("evil_api/init.lua")
 
-AddCSLuaFile("evil_headcrab/sh_settings.lua")
-AddCSLuaFile("evil_headcrab/sh_struggle.lua")
-AddCSLuaFile("evil_headcrab/sh_player.lua")
-AddCSLuaFile("evil_headcrab/cl_grip.lua")
-include("evil_headcrab/sh_settings.lua")
-include("evil_headcrab/sh_struggle.lua")
-include("evil_headcrab/sh_player.lua")
-if CLIENT then include("evil_headcrab/cl_grip.lua") end
+AddCSLuaFile("evil_barnacle/sh_settings.lua")
+include("evil_barnacle/sh_settings.lua")
 if SERVER then
-	include("evil_headcrab/sv_barnacle.lua")
-	include("evil_headcrab/sv_prey.lua")
+	include("evil_barnacle/sv_prey.lua")
+	include("evil_barnacle/sv_barnacle.lua")
 end

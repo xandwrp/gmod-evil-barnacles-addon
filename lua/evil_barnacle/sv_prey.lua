@@ -81,10 +81,10 @@ local function Float(prey, on)
 	end
 end
 
-function EvilHeadcrab.Prey(body, maw, fighter)
+function EvilBarnacle.Prey(body, maw, fighter)
 	local prey = {
 		body = body, maw = maw, start = CurTime(), voice = Voice(body:GetModel()),
-		head = Phys(body, EvilHeadcrab.HEAD), pelvis = Phys(body, "ValveBiped.Bip01_Pelvis"),
+		head = Phys(body, EvilBarnacle.HEAD), pelvis = Phys(body, "ValveBiped.Bip01_Pelvis"),
 		sides = {}, stride = 0, plead = 0, heave = 0, burst = 0, burstEnd = 0,
 	}
 	for _, def in ipairs(SIDES) do
@@ -100,7 +100,7 @@ function EvilHeadcrab.Prey(body, maw, fighter)
 	return prey
 end
 
-function EvilHeadcrab.Calm(prey)
+function EvilBarnacle.Calm(prey)
 	if prey then Float(prey, false) end
 end
 
@@ -213,25 +213,25 @@ local function Fight(prey, now, dt, up)
 	if now - prey.start >= PANIC + FADE then Limp(prey, now) end
 end
 
-function EvilHeadcrab.Thrash(prey, now, dt)
+function EvilBarnacle.Thrash(prey, now, dt)
 	if not prey or not prey.fighter or not IsValid(prey.maw) then return end
 	Claw(prey, now, dt)
 	Kick(prey, now, dt, prey.maw:GetUp(), 1)
 	Plead(prey, now)
 end
 
-function EvilHeadcrab.Hold(maw, body, prey)
-	prey = prey or EvilHeadcrab.Prey(body, maw, false)
+function EvilBarnacle.Hold(maw, body, prey)
+	prey = prey or EvilBarnacle.Prey(body, maw, false)
 	prey.maw = maw
 	held[body] = prey
 end
 
-function EvilHeadcrab.Seated(body)
+function EvilBarnacle.Seated(body)
 	local prey = held[body]
 	if prey and not prey.fighter then Limp(prey, CurTime()) end
 end
 
-function EvilHeadcrab.Free(body)
+function EvilBarnacle.Free(body)
 	local prey = held[body]
 	held[body] = nil
 	if not prey or not IsValid(body) then return end
@@ -242,7 +242,7 @@ function EvilHeadcrab.Free(body)
 	end
 end
 
-hook.Add("Think", "EvilHeadcrabPrey", function()
+hook.Add("Think", "EvilBarnaclePrey", function()
 	local now, dt = CurTime(), FrameTime()
 	for body, prey in pairs(held) do
 		if not IsValid(body) or not IsValid(prey.maw) or body.EvilBond ~= prey.maw then
