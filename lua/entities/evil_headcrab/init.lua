@@ -58,10 +58,18 @@ local function HeadPos(ent)
 	return bone and ent:GetBonePosition(bone)
 end
 
+local ignorePlayers = GetConVar("ai_ignoreplayers")
+
 function ENT:Host(ent)
-	if not IsValid(ent) or not ent:IsNPC() or ent:Health() <= 0 then return false end
-	local class = ent:GetClass()
-	if class:find("headcrab", 1, true) or class:find("zombie", 1, true) then return false end
+	if not IsValid(ent) or ent:Health() <= 0 then return false end
+	if ent:IsPlayer() then
+		if EvilHeadcrab.Settings:Get("targets_players") == 0 or not ent:Alive() or ent:InVehicle() then return false end
+		if ent:GetMoveType() == MOVETYPE_NOCLIP or ent:IsFlagSet(FL_NOTARGET) or (ignorePlayers and ignorePlayers:GetBool()) then return false end
+	else
+		if not ent:IsNPC() or EvilHeadcrab.Settings:Get("targets_npcs") == 0 then return false end
+		local class = ent:GetClass()
+		if class:find("headcrab", 1, true) or class:find("zombie", 1, true) then return false end
+	end
 	if Evil.Frozen(ent) or Evil.Downed(ent) or not Evil.Claimable(ent, self) then return false end
 	if self.shun and (self.shun[ent] or 0) > CurTime() then return false end
 	return ent:LookupBone(EvilHeadcrab.HEAD) ~= nil
@@ -74,7 +82,7 @@ function ENT:Sees(ent)
 end
 
 function ENT:FindPrey()
-	if EvilHeadcrab.Settings:Get("targets_npcs") == 0 then return end
+	if EvilHeadcrab.Settings:Get("targets_npcs") == 0 and EvilHeadcrab.Settings:Get("targets_players") == 0 then return end
 	local pos, best, bestDist = self:GetPos()
 	for _, ent in ipairs(ents.FindInSphere(pos, SIGHT)) do
 		if self:Host(ent) then
@@ -230,7 +238,7 @@ function ENT:Hunt(prey)
 	self:EmitSound("NPC_HeadCrab.Alert")
 	self:Scuttle(1)
 	local stop = CurTime() + HUNT_FOR
-	while CurTime() < stop and self:Host(prey) and EvilHeadcrab.Settings:Get("targets_npcs") ~= 0 do
+	while CurTime() < stop and self:Host(prey) do
 		local dist = self:GetPos():Distance(prey:GetPos())
 		if dist > LOSE then break end
 		if dist < LEAP_RANGE and self:Sees(prey) then

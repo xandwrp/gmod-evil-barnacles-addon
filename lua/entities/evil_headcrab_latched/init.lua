@@ -20,8 +20,8 @@ local PRY_END = 0.4
 local STEP = 18
 local DROP = 48
 local CORPSE_PUSH = 150
-local RUNS = { ACT_RUN_PROTECTED, ACT_RUN_PANICKED, ACT_RUN }
-local IDLES = { "idle_unarmed", "idle_subtle" }
+local RUNS = { ACT_RUN_PROTECTED, ACT_RUN_PANICKED, ACT_RUN, ACT_HL2MP_RUN_PANICKED, ACT_HL2MP_RUN_PROTECTED, ACT_HL2MP_RUN }
+local IDLES = { "idle_unarmed", "idle_subtle", "idle_all_scared" }
 local UNARMED_IDLES = {
 	["models/monk.mdl"] = "LineIdle01",
 }
@@ -40,6 +40,7 @@ local DROP_FIND = 4096
 local THROW, THROW_UP, THROW_CLEAR = 220, 200, 16
 local SHUN = 15
 local FLEE = 600
+local MASH_DECAY = 0.1
 
 local function Valid(seq)
 	return seq and seq > 0 and seq or nil
@@ -59,7 +60,7 @@ local function IdleSequence(v)
 		local seq = Valid(v:LookupSequence(name))
 		if seq then return seq end
 	end
-	return Valid(v:SelectWeightedSequence(ACT_IDLE))
+	return Valid(v:SelectWeightedSequence(ACT_IDLE)) or Valid(v:SelectWeightedSequence(ACT_HL2MP_IDLE))
 end
 
 function ENT:Initialize()
@@ -110,7 +111,20 @@ function ENT:Grab(v)
 	self:Seat(v)
 	self:Cling("headcrabbed", CLING / (self.done - self.start))
 	self:EmitSound("NPC_HeadCrab.Bite")
+	if v:IsPlayer() then self:Resist(v) end
 	return true
+end
+
+function ENT:Resist(ply)
+	Evil.Mash(ply, self, {
+		gain = 1 / EvilHeadcrab.Settings:Get("escape_presses"), decay = MASH_DECAY,
+		done = function() if self.victim == ply then self:PryOff() end end,
+	})
+end
+
+function ENT:Unresist(ply)
+	local m = ply:IsPlayer() and Evil.Mashing(ply)
+	if m and m.source == self then Evil.StopMash(ply) end
 end
 
 function ENT:EvilPose()
@@ -312,6 +326,7 @@ end
 function ENT:Offer(now, dt)
 	local b, v = self.offer.barnacle, self.victim
 	if not IsValid(b) or b:Health() <= 0 then return self:Withdraw() end
+	if v:IsPlayer() and b:GetEnemy() == v then return self:Haul(b) end
 	local body = b:GetInternalVariable("m_hRagdoll")
 	if b:GetEnemy() == v and IsValid(body) then return self:Grabbed(b, body) end
 	if now > self.offer.ends then return self:Withdraw(true) end
@@ -333,6 +348,27 @@ function ENT:Grabbed(b, body)
 	self.lifted = { barnacle = b, body = body }
 	self.prey = EvilHeadcrab.Prey(body, b, true)
 	self:Seat(body)
+end
+
+function ENT:Haul(b)
+	local v = self.victim
+	self.offer = nil
+	self.hauled = { barnacle = b }
+	self:Unresist(v)
+	Evil.Unpose(v, self)
+end
+
+function ENT:Hang()
+	local h = self.hauled
+	local b = h.barnacle
+	if not IsValid(b) or b:Health() <= 0 or b:GetEnemy() ~= self.victim then return self:FallOff() end
+	if b:GetInternalVariable("m_bLiftingPrey") then
+		h.rising = true
+	elseif h.rising then
+		self:EmitSound("NPC_HeadCrab.Die")
+		self:Release()
+		self:Remove()
+	end
 end
 
 function ENT:Ride(now, dt)
@@ -390,15 +426,17 @@ function ENT:Think()
 	self.last = now
 	local v = self.victim
 	if v then
-		if not IsValid(v) or v:Health() <= 0 or Evil.Owner(v) ~= self then
+		if not IsValid(v) or v:Health() <= 0 or (not self.hauled and Evil.Owner(v) ~= self) then
 			self:FallOff()
 			return
 		end
-		if self.lifted then
+		if self.hauled then
+			self:Hang()
+		elseif self.lifted then
 			self:Ride(now, dt)
 		elseif self.offer then
 			self:Offer(now, dt)
-		elseif now >= self.done then
+		elseif now >= self.done and not v:IsPlayer() then
 			self:PryOff()
 			return
 		else
@@ -446,13 +484,14 @@ end
 
 function ENT:Release()
 	if self.held then self:Drop() end
-	local hold = self.lifted or self.offer or self.lure
+	local hold = self.lifted or self.offer or self.lure or self.hauled
 	local lifted = self.lifted ~= nil
-	self.lifted, self.offer, self.lure = nil, nil, nil
+	self.lifted, self.offer, self.lure, self.hauled = nil, nil, nil, nil
 	if hold and IsValid(hold.barnacle) and hold.barnacle.EvilThrall == self then hold.barnacle.EvilThrall = nil end
 	local v = self.victim
 	self.victim = nil
 	if not IsValid(v) then return end
+	self:Unresist(v)
 	v.EvilCrab = nil
 	v:SetNW2Float("EvilCrabbed", 0)
 	v:SetNW2Float("EvilCrabDone", 0)
@@ -503,7 +542,7 @@ function ENT:PryOff()
 	self:Release()
 	local crab = self:Shed(pos, yaw, throw * THROW + Vector(0, 0, THROW_UP), { [v] = CurTime() + SHUN })
 	crab:EmitSound("NPC_HeadCrab.Pain")
-	if IsValid(v) then Flee(v, -throw) end
+	if IsValid(v) and v:IsNPC() then Flee(v, -throw) end
 	self:Remove()
 end
 

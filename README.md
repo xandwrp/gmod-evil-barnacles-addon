@@ -20,6 +20,7 @@ Entities > Syhgma's Evil Entities > Evil headcrab or Evil barnacle. The barnacle
 - The barnacle hauls them up, eats the headcrab at the mouth and keeps them. They claw at it and kick for a while, then go limp
 - The barnacle can't be hurt while it's wearing someone. Kill the body and the barnacle dies and drops it
 - Shoot the headcrab off before it gets them to a barnacle to let them go
+- With players turned on it goes for them too. They get run around the same way and have to mash jump to pry it off. If it gets them to a barnacle, the barnacle takes it from there
 
 Otherwise the evil barnacle is a normal barnacle.
 
@@ -28,5 +29,7 @@ Otherwise the evil barnacle is a normal barnacle.
 Spawn menu > Utilities > Syhgma's Evil Entities > Evil headcrabs (superadmins), or the convars. They all start with `evil_headcrab_`.
 
 - Targets NPCs
-- Hold time, how many seconds it hangs on before the victim pries it off
+- Targets players, off by default
+- Jump presses to escape, roughly how many it takes a player to pry it off
+- Hold time, how many seconds it hangs on before an NPC pries it off
 - Barnacle sense range, how far it can sense an evil barnacle to steer toward, 0 for never
