@@ -1,5 +1,6 @@
 EvilHeadcrab = EvilHeadcrab or {}
 EvilHeadcrab.HEAD = "ValveBiped.Bip01_Head1"
+EvilHeadcrab.SEAT = Angle(-90, 180, 90)
 
 EvilHeadcrab.Settings = Evil.Settings({
 	id = "evil_headcrab",

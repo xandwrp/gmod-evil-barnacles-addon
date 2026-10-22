@@ -10,15 +10,30 @@ function ENT:EvilPose(v)
 	if v:IsPlayer() then return v:GetPos(), Facing(v) end
 end
 
+local function Head(v)
+	local bone = v:LookupBone(EvilHeadcrab.HEAD)
+	if not bone then return end
+	local was = v:GetRenderAngles()
+	v:SetRenderOrigin(v:GetPos())
+	v:SetRenderAngles(Facing(v))
+	v:InvalidateBoneCache()
+	v:SetupBones()
+	local m = v:GetBoneMatrix(bone)
+	v:SetRenderOrigin(nil)
+	v:SetRenderAngles(was)
+	v:InvalidateBoneCache()
+	return m
+end
+
 function ENT:Draw(flags)
 	local v = self:GetParent()
-	if not IsValid(v) or not v:IsPlayer() or not Evil.Posed(v) then
+	local m = IsValid(v) and v:IsPlayer() and Evil.Posed(v) and Head(v)
+	if not m then
 		self:DrawModel(flags)
 		return
 	end
-	local origin, was = v:GetPos(), self:GetRenderAngles()
-	local lp, la = WorldToLocal(self:GetPos(), self:GetAngles(), origin, Angle(0, v:GetRenderAngles().y, 0))
-	local pos, ang = LocalToWorld(lp, la, origin, Facing(v))
+	local was = self:GetRenderAngles()
+	local pos, ang = LocalToWorld(vector_origin, EvilHeadcrab.SEAT, m:GetTranslation(), m:GetAngles())
 	self:SetRenderOrigin(pos)
 	self:SetRenderAngles(ang)
 	self:InvalidateBoneCache()

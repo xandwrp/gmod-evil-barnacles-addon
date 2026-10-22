@@ -4,7 +4,6 @@ include("shared.lua")
 
 local MODEL = "models/headcrabclassic.mdl"
 local HEALTH = 10
-local SEAT = Angle(-90, 180, 90)
 local MINS, MAXS = Vector(-12, -12, -6), Vector(12, 12, 16)
 local CLING = 176 / 30
 local RUN_SLOW, RUN_FAST = 90, 270
@@ -344,7 +343,7 @@ end
 function ENT:Seat(ent)
 	self:FollowBone(ent, ent:LookupBone(EvilHeadcrab.HEAD))
 	self:SetLocalPos(vector_origin)
-	self:SetLocalAngles(SEAT)
+	self:SetLocalAngles(EvilHeadcrab.SEAT)
 end
 
 function ENT:Grabbed(b, body)
