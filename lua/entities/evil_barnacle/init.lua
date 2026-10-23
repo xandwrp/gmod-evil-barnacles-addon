@@ -25,12 +25,8 @@ function ENT:SpawnFunction(ply, tr)
 	if not tr.Hit then return end
 	local pos, normal = Ceiling(tr)
 	if not pos then return end
-	local barnacle = ents.Create("npc_barnacle")
-	barnacle:SetPos(pos - Vector(0, 0, HANG))
-	barnacle:SetAngles(Angle(0, ply:EyeAngles().y + 180, 0))
-	barnacle:Spawn()
-	barnacle:Activate()
-	EvilBarnacle.Add(barnacle)
+	local barnacle = EvilBarnacle.Spawn(pos, ply:EyeAngles().y + 180)
+	if not barnacle then return end
 	Fungus(pos, normal, ply)
 	return barnacle
 end

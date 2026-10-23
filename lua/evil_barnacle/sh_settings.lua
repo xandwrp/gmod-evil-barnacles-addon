@@ -21,5 +21,7 @@ EvilBarnacle.Settings = Evil.Settings({
 			help = "How far a body let down on the tongue can walk out from under the barnacle. At 0 it keeps them hanging" },
 		{ name = "leash_after", default = 120, min = 10, max = 3600, decimals = 0, label = "Let down after", needs = "EvilFungus",
 			help = "Seconds a body hangs in the fungus before the barnacle lets it down on the tongue" },
+		{ name = "grown", default = 6, min = 0, max = 50, decimals = 0, label = "Grown from fungus", needs = "EvilFungus",
+			help = "Most barnacles fungus growing over a ceiling can sprout on its own. At 0 it sprouts none" },
 	},
 })

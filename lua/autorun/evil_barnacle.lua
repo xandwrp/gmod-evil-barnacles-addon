@@ -66,4 +66,5 @@ else
 	include("evil_barnacle/sv_barnacle.lua")
 	include("evil_barnacle/sv_catch.lua")
 	include("evil_barnacle/sv_leash.lua")
+	include("evil_barnacle/sv_grow.lua")
 end

@@ -11,6 +11,19 @@ local STRIKE = {
 
 local pulls = {}
 
+EvilBarnacle.HANG = 2
+
+function EvilBarnacle.Spawn(pos, yaw)
+	local barnacle = ents.Create("npc_barnacle")
+	if not IsValid(barnacle) then return end
+	barnacle:SetPos(pos - Vector(0, 0, EvilBarnacle.HANG))
+	barnacle:SetAngles(Angle(0, yaw, 0))
+	barnacle:Spawn()
+	barnacle:Activate()
+	EvilBarnacle.Add(barnacle)
+	return barnacle
+end
+
 function EvilBarnacle.Below(barnacle)
 	local start = barnacle:GetPos()
 	local tr = util.TraceLine({ start = start, endpos = start - Vector(0, 0, FLOOR), mask = MASK_NPCSOLID_BRUSHONLY })
