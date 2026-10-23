@@ -5,7 +5,7 @@ local barnacles = {}
 local caught = {}
 
 function EvilBarnacle.Add(b)
-	b.EvilBarnacle = true
+	b.EvilBarnacle, b.EvilFungusAlly = true, true
 	barnacles[b] = true
 end
 
