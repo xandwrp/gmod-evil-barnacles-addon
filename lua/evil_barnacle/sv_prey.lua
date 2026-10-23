@@ -272,14 +272,21 @@ function EvilBarnacle.Hold(maw, body, prey)
 	held[body] = prey
 end
 
+EvilBarnacle.Plead, EvilBarnacle.Moan = Plead, Moan
+
+function EvilBarnacle.Muffle(prey)
+	if prey.muffled then return end
+	if prey.said then prey.body:StopSound(prey.said) end
+	Say(prey, PLEAD, 85, math.random(108, 118), 1)
+	prey.muffled = true
+	prey.plead = CurTime() + LAST_GAP
+end
+
 function EvilBarnacle.Bitten(body)
 	local prey = held[body]
 	if not prey or prey.muffled then return end
 	if EvilFungus and IsValid(prey.maw) then Root(prey, CurTime()) end
-	if prey.said then body:StopSound(prey.said) end
-	Say(prey, PLEAD, 85, math.random(108, 118), 1)
-	prey.muffled = true
-	prey.plead = CurTime() + LAST_GAP
+	EvilBarnacle.Muffle(prey)
 end
 
 function EvilBarnacle.Seated(body)

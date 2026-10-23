@@ -29,6 +29,7 @@ Entities > Syhgma's Evil Entities > Evil barnacle. It goes on the ceiling above 
 - With Evil Fungus installed, it grows a patch of fungus on the ceiling around itself. The patch stays put and stops growing at a set size, until other fungus grows into it and they join up
 - With Evil Fungus, a body that's been in the fungus a while gets dropped, still on the tongue. It gets up and paces a circle under the barnacle, still on the tongue. Whoever it grabs gets the tongue instead and dragged back under to be caught, and the old body bursts into fungus
 - Kill the barnacle and the leash snaps, the body wanders off to burst somewhere high. Players dragged on it can mash jump to get loose
+- Ceiling cairne mode (needs Evil Fungus): instead of eating, tentacles grab the wrists, ankles and hips and hoist the body flat against the ceiling beside the barnacle, then the fungus cocoons it there. They fight it the whole way and keep twitching for a while after they are locked in, then it wires them in like any other kept body. Each barnacle builds up a few of these around itself, and players can mash jump to get loose until the cocoon closes
 
 ## Settings
 
@@ -39,3 +40,5 @@ Spawn menu > Utilities > Syhgma's Evil Entities > Evil barnacles (superadmins), 
 - Fungus takeover, seconds the fungus takes to turn a kept body, all but the head
 - Leash, how far a body let down on the tongue can walk out from under the barnacle. 0 keeps them hanging
 - Let down after, seconds a body hangs in the fungus before it gets let down
+- Grown from fungus, most barnacles fungus on a ceiling can sprout on its own. 0 for none
+- Ceiling cairne, hoist and cocoon whoever gets grabbed instead of eating them

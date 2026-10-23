@@ -104,7 +104,7 @@ local function Away(at)
 	return best
 end
 
-local function Clone(old)
+function EvilBarnacle.Clone(old)
 	local rag = ents.Create("prop_ragdoll")
 	if not IsValid(rag) then return end
 	rag:SetModel(old:GetModel())
@@ -164,7 +164,7 @@ function EvilBarnacle.Lower(b, body)
 	if radius <= 0 or leashes[b] or not (hosts and hosts.Unleash) or b.EvilBond ~= body then return end
 	local floor = EvilBarnacle.Below(b)
 	if not floor then return end
-	local rag = Clone(body)
+	local rag = EvilBarnacle.Clone(body)
 	if not rag then return end
 	local w = EvilFungus.Sleep.wired[body]
 	EvilBarnacle.Shed(b, true)
