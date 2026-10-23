@@ -190,6 +190,9 @@ local function Still(prey, now)
 	if now < (prey.wireAt or 0) or not (EvilFungus and EvilFungus.Wire) then return end
 	prey.wireAt = now + WIRE_EVERY
 	prey.wired = IsValid(prey.head) and EvilFungus.Wire(prey.body, prey.head:GetPos(), EvilBarnacle.Settings:Get("fungus_time"))
+	if not prey.wired then return end
+	prey.wiredAt = prey.wiredAt or now
+	if now - prey.wiredAt >= EvilBarnacle.Settings:Get("leash_after") then EvilBarnacle.Lower(prey.maw, prey.body) end
 end
 
 local function Legs(prey, now)
@@ -234,11 +237,11 @@ function EvilBarnacle.Seated(body)
 	if prey and not prey.fighter then Limp(prey, CurTime()) end
 end
 
-function EvilBarnacle.Free(body)
+function EvilBarnacle.Free(body, keep)
 	local prey = held[body]
 	held[body] = nil
 	if not prey or not IsValid(body) then return end
-	if prey.wired then EvilFungus.Unwire(body) end
+	if prey.wired and not keep then EvilFungus.Unwire(body) end
 	Float(prey, false)
 	for i, d in pairs(prey.damping or {}) do
 		local phys = body:GetPhysicsObjectNum(i)

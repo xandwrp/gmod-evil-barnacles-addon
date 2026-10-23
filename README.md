@@ -26,6 +26,8 @@ Entities > Syhgma's Evil Entities > Evil barnacle. It goes on the ceiling above 
 - It can't be hurt while it's wearing someone. Shoot the body enough and the barnacle dies and drops it
 - If it catches someone new it drops the old body for the new one
 - With Evil Fungus installed, it grows a patch of fungus on the ceiling around itself. The patch stays put and stops growing at a set size, until other fungus grows into it and they join up
+- With Evil Fungus, a body that's been in the fungus a while gets let down on the tongue. It gets up and paces a circle under the barnacle, still on the tongue. Whoever it grabs gets the tongue instead and dragged back under to be caught, and the old body bursts into fungus
+- Kill the barnacle and the leash snaps, the body wanders off to burst somewhere high. Players dragged on it can mash jump to get loose
 
 ## Settings
 
@@ -34,3 +36,5 @@ Spawn menu > Utilities > Syhgma's Evil Entities > Evil barnacles (superadmins), 
 - Jump presses to escape, roughly how many it takes a player to struggle off the tongue
 - Fungus, how many strands of Evil Fungus a new barnacle grows around itself. 0 for none
 - Fungus takeover, seconds the fungus takes to turn a kept body, all but the head
+- Leash, how far a body let down on the tongue can walk out from under the barnacle. 0 keeps them hanging
+- Let down after, seconds a body hangs in the fungus before it gets let down

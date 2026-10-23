@@ -11,7 +11,7 @@ local STRIKE = {
 
 local pulls = {}
 
-local function Below(barnacle)
+function EvilBarnacle.Below(barnacle)
 	local start = barnacle:GetPos()
 	local tr = util.TraceLine({ start = start, endpos = start - Vector(0, 0, FLOOR), mask = MASK_NPCSOLID_BRUSHONLY })
 	if tr.Hit and not tr.StartSolid then return tr.HitPos end
@@ -26,8 +26,8 @@ local function Kill(ent, attacker)
 	ent:TakeDamageInfo(dmg)
 end
 
-local function Unpin(body)
-	EvilBarnacle.Free(body)
+local function Unpin(body, keep)
+	EvilBarnacle.Free(body, keep)
 	body.EvilBond = nil
 	Evil.Unclaim(body)
 	for i = 0, body:GetPhysicsObjectCount() - 1 do
@@ -76,11 +76,11 @@ hook.Add("Think", "EvilBarnaclePull", function()
 	end
 end)
 
-function EvilBarnacle.Shed(barnacle)
+function EvilBarnacle.Shed(barnacle, keep)
 	local body = barnacle.EvilBond
 	barnacle.EvilBond = nil
 	pulls[barnacle] = nil
-	if IsValid(body) then Unpin(body) end
+	if IsValid(body) then Unpin(body, keep) end
 end
 
 function EvilBarnacle.Bond(barnacle, body, head, health, prey)
@@ -88,7 +88,7 @@ function EvilBarnacle.Bond(barnacle, body, head, health, prey)
 	barnacle.EvilBond, body.EvilBond = body, barnacle
 	body.EvilHealth = health
 	Evil.Claim(body, barnacle)
-	local floor = Below(barnacle)
+	local floor = EvilBarnacle.Below(barnacle)
 	if floor then barnacle:SetKeyValue("RestDist", tostring(barnacle:GetPos().z - floor.z)) end
 	local phys = body:GetPhysicsObjectNum(head)
 	if IsValid(phys) then phys:EnableMotion(false) end

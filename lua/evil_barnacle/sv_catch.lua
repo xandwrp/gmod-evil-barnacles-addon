@@ -163,7 +163,7 @@ end)
 
 hook.Add("PlayerDeathThink", "EvilBarnacleSocket", function(ply)
 	local body = ply.EvilSocket
-	if not IsValid(body) or not IsValid(body.EvilBond) then return end
+	if not IsValid(body) or not (IsValid(body.EvilBond) or IsValid(body.EvilLeash)) then return end
 	if CurTime() - ply:GetNW2Float(EvilBarnacle.HELD_VAR, 0) < EvilBarnacle.GIVE_UP or not ply:KeyPressed(IN_JUMP) then return false end
 	ply.EvilSocket = nil
 	ply:SetNW2Float(EvilBarnacle.HELD_VAR, 0)
