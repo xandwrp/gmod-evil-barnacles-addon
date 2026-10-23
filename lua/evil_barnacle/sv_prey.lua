@@ -12,6 +12,8 @@ local KICK_JITTER, KICK_MIN, KICK_MAX = 8, 0.3, 0.7
 local HEAVE, HEAVE_MIN, HEAVE_MAX = 160, 0.8, 1.8
 local PLEAD_MIN, PLEAD_MAX = 1.4, 2.8
 local MOAN_MIN, MOAN_MAX = 2.5, 5
+local LAST_GAP = 2.5
+local MUFFLE_LEVEL, MUFFLE_VOLUME, MUFFLE_PITCH = 55, 0.12, 0.85
 local LIMP_LIN, LIMP_ANG = 0.4, 1.2
 local SETTLE = 3
 local WIRE_EVERY = 2
@@ -59,7 +61,9 @@ end
 
 local function Say(prey, list, level, pitch, volume)
 	if not prey.voice then return end
-	prey.body:EmitSound(prey.voice .. list[math.random(#list)] .. ".wav", level, pitch, volume)
+	if prey.muffled then level, pitch, volume = MUFFLE_LEVEL, pitch * MUFFLE_PITCH, volume * MUFFLE_VOLUME end
+	prey.said = prey.voice .. list[math.random(#list)] .. ".wav"
+	prey.body:EmitSound(prey.said, level, pitch, volume)
 end
 
 local function Flat(v, up)
@@ -230,6 +234,15 @@ function EvilBarnacle.Hold(maw, body, prey)
 	prey = prey or EvilBarnacle.Prey(body, maw, false)
 	prey.maw = maw
 	held[body] = prey
+end
+
+function EvilBarnacle.Bitten(body)
+	local prey = held[body]
+	if not prey or prey.muffled then return end
+	if prey.said then body:StopSound(prey.said) end
+	Say(prey, PLEAD, 85, math.random(108, 118), 1)
+	prey.muffled = true
+	prey.plead = CurTime() + LAST_GAP
 end
 
 function EvilBarnacle.Seated(body)

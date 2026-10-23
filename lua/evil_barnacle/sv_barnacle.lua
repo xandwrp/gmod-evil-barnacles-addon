@@ -54,6 +54,7 @@ local function Pull(barnacle, pull, dt)
 	if not pull.bitten then
 		pull.bitten = true
 		barnacle:EmitSound("NPC_Barnacle.FinalBite")
+		EvilBarnacle.Bitten(pull.body)
 		pull.low = math.min(barnacle:WorldToLocal(pos).z, SOCKET)
 	end
 	local target = barnacle:LocalToWorld(Vector(0, 0, math.Clamp(Strike(cycle), pull.low, SOCKET)))
