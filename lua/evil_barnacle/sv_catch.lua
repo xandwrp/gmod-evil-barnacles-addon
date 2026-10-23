@@ -89,6 +89,7 @@ local function Socket(b, c)
 	b:Input("LetGo")
 	v.EvilSocket = body
 	v:KillSilent()
+	v:SetNW2Float(EvilBarnacle.HELD_VAR, CurTime())
 	EvilBarnacle.Bond(b, body, head, math.max(v:GetMaxHealth(), 1))
 end
 
@@ -160,6 +161,15 @@ hook.Add("PostPlayerDeath", "EvilBarnacleSocket", function(ply)
 	ply:SpectateEntity(body)
 end)
 
+hook.Add("PlayerDeathThink", "EvilBarnacleSocket", function(ply)
+	local body = ply.EvilSocket
+	if not IsValid(body) or not IsValid(body.EvilBond) then return end
+	if CurTime() - ply:GetNW2Float(EvilBarnacle.HELD_VAR, 0) < EvilBarnacle.GIVE_UP or not ply:KeyPressed(IN_JUMP) then return false end
+	ply.EvilSocket = nil
+	ply:SetNW2Float(EvilBarnacle.HELD_VAR, 0)
+end)
+
 hook.Add("PlayerSpawn", "EvilBarnacleSocket", function(ply)
 	ply.EvilSocket = nil
+	ply:SetNW2Float(EvilBarnacle.HELD_VAR, 0)
 end)

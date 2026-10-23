@@ -18,7 +18,7 @@ Entities > Syhgma's Evil Entities > Evil barnacle. It goes on the ceiling above 
 
 - Catches and hauls people up like a normal barnacle
 - Players mash jump on the way up to struggle off the tongue
-- Reach the mouth and it kills them, no gibs, no bones. It keeps the body hanging from its mouth
+- Reach the mouth and it kills them, no gibs, no bones. It keeps the body hanging from its mouth, and they watch from there until they press jump to give up
 - NPCs get kept the same way. They claw at it and kick for a while, then go limp
 - Once a body goes still it stays put. With fungus close by, it gets wired in and slowly turns to fungus, all but the head
 - It can't be hurt while it's wearing someone. Shoot the body enough and the barnacle dies and drops it
@@ -31,3 +31,4 @@ Spawn menu > Utilities > Syhgma's Evil Entities > Evil barnacles (superadmins), 
 
 - Jump presses to escape, roughly how many it takes a player to struggle off the tongue
 - Fungus, how many strands of Evil Fungus a new barnacle grows around itself. 0 for none
+- Fungus takeover, seconds the fungus takes to turn a kept body, all but the head
