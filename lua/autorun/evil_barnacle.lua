@@ -1,4 +1,7 @@
-if SERVER then resource.AddWorkshop("3823740816") end
+if SERVER then
+	resource.AddWorkshop("3823740816")
+	resource.AddWorkshop("3825026975")
+end
 if not file.Exists("evil_api/init.lua", "LUA") then
 	EvilNeedsAPI = EvilNeedsAPI or {}
 	EvilNeedsAPI[#EvilNeedsAPI + 1] = "Evil barnacles"

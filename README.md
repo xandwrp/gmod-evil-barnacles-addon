@@ -2,6 +2,8 @@
 
 > Barnacles for Garry's Mod that keep what they catch.
 
+On the [Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3825026975).
+
 ## Needs
 
 - [Syhgma's Evil API](https://steamcommunity.com/sharedfiles/filedetails/?id=3823740816) ([source](https://github.com/xandwrp/gmod-evil-api))
