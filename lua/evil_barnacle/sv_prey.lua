@@ -95,10 +95,15 @@ local function Raising(prey, now)
 	return prey.rooted ~= nil and now < prey.rooted + ROOT_RAMP + ROOT_HOLD
 end
 
+local function Rooting(prey, now)
+	if not prey.rooted then return 0 end
+	local x = math.Clamp((now - prey.rooted) / ROOT_RAMP, 0, 1)
+	return x * x * (3 - 2 * x)
+end
+
 local function Raise(prey, now, dt)
 	if not prey.rooted or prey.frozen then return end
-	local k = ROOT_K * math.Clamp((now - prey.rooted) / ROOT_RAMP, 0, 1)
-	if k <= 0 then return end
+	local k = ROOT_K * Rooting(prey, now)
 	local down = prey.maw:GetUp() * ROOT_DROP
 	for _, side in ipairs(prey.sides) do
 		if side.anchor then Spring(side.hand, side.anchor - down, k, ROOT_DAMP, dt) end
@@ -138,7 +143,7 @@ function EvilBarnacle.Calm(prey)
 	if prey then Float(prey, false) end
 end
 
-local function Claw(prey, now, dt)
+local function Claw(prey, now, dt, grip)
 	local maw = prey.maw
 	local head = maw:WorldToLocal(prey.head:GetPos())
 	for _, side in ipairs(prey.sides) do
@@ -150,7 +155,7 @@ local function Claw(prey, now, dt)
 		end
 		local top = math.min(head.z + CLAW_UP, LIP)
 		local target = maw:LocalToWorld(Vector(head.x + side.aim.x, head.y + side.aim.y, top + side.aim.z))
-		Spring(side.hand, target, CLAW_K, CLAW_DAMP, dt)
+		Spring(side.hand, target, CLAW_K * grip, CLAW_DAMP * grip, dt)
 	end
 end
 
@@ -243,7 +248,8 @@ local function Fight(prey, now, dt, up)
 	local k = Legs(prey, now)
 	Kick(prey, now, dt, up, k)
 	if now - prey.start < PANIC then
-		if not prey.rooted then Claw(prey, now, dt) end
+		local grip = 1 - Rooting(prey, now)
+		if grip > 0 then Claw(prey, now, dt, grip) end
 		Heave(prey, now, up)
 		Plead(prey, now)
 	else
@@ -255,7 +261,7 @@ end
 
 function EvilBarnacle.Thrash(prey, now, dt)
 	if not prey or not prey.fighter or not IsValid(prey.maw) then return end
-	Claw(prey, now, dt)
+	Claw(prey, now, dt, 1)
 	Kick(prey, now, dt, prey.maw:GetUp(), 1)
 	Plead(prey, now)
 end
