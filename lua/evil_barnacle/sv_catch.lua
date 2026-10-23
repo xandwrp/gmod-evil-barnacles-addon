@@ -140,7 +140,7 @@ hook.Add("Think", "EvilBarnacleCatch", function()
 	for b in pairs(barnacles) do
 		if not IsValid(b) then
 			barnacles[b] = nil
-		elseif not caught[b] and b:Health() > 0 and b:GetInternalVariable("m_bLiftingPrey") then
+		elseif not caught[b] and b:Health() > 0 and b:GetInternalVariable("m_bLiftingPrey") and not EvilBarnacle.Leashed(b) then
 			local v = b:GetEnemy()
 			if IsValid(v) then Catch(b, v) end
 		end
