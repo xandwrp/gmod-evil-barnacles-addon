@@ -14,6 +14,8 @@ local PLEAD_MIN, PLEAD_MAX = 1.4, 2.8
 local MOAN_MIN, MOAN_MAX = 2.5, 5
 local LAST_GAP = 2.5
 local MUFFLE_LEVEL, MUFFLE_VOLUME, MUFFLE_PITCH = 55, 0.12, 0.85
+local ROOT_SPREAD, ROOT_DROP = 26, 14
+local ROOT_K, ROOT_DAMP, ROOT_RAMP, ROOT_HOLD = 30, 6, 10, 2
 local LIMP_LIN, LIMP_ANG = 0.4, 1.2
 local SETTLE = 3
 local WIRE_EVERY = 2
@@ -31,8 +33,8 @@ local PANIC_FACE = {
 local PLEAD = { "help01", "no01", "no02", "ohno", "startle01", "startle02", "pain07", "pain08", "pain09", "gethellout" }
 local MOAN = { "moan01", "moan02", "moan03", "moan04", "moan05" }
 local SIDES = {
-	{ hand = "ValveBiped.Bip01_R_Hand", fore = "ValveBiped.Bip01_R_Forearm", upper = "ValveBiped.Bip01_R_UpperArm", foot = "ValveBiped.Bip01_R_Foot", thigh = "ValveBiped.Bip01_R_Thigh", phase = 0, out = -1 },
-	{ hand = "ValveBiped.Bip01_L_Hand", fore = "ValveBiped.Bip01_L_Forearm", upper = "ValveBiped.Bip01_L_UpperArm", foot = "ValveBiped.Bip01_L_Foot", thigh = "ValveBiped.Bip01_L_Thigh", phase = math.pi, out = 1 },
+	{ hand = "ValveBiped.Bip01_R_Hand", fore = "ValveBiped.Bip01_R_Forearm", upper = "ValveBiped.Bip01_R_UpperArm", foot = "ValveBiped.Bip01_R_Foot", thigh = "ValveBiped.Bip01_R_Thigh", phase = 0, out = -1, root = EvilBarnacle.ROOT_R_VAR },
+	{ hand = "ValveBiped.Bip01_L_Hand", fore = "ValveBiped.Bip01_L_Forearm", upper = "ValveBiped.Bip01_L_UpperArm", foot = "ValveBiped.Bip01_L_Foot", thigh = "ValveBiped.Bip01_L_Thigh", phase = math.pi, out = 1, root = EvilBarnacle.ROOT_L_VAR },
 }
 
 local held = {}
@@ -73,6 +75,34 @@ end
 local function Spring(phys, target, k, damp, dt)
 	phys:Wake()
 	phys:AddVelocity(((target - phys:GetPos()) * k - phys:GetVelocity() * damp) * dt)
+end
+
+local function Root(prey, now)
+	local maw, body = prey.maw, prey.body
+	local up = maw:GetUp()
+	local left = #prey.sides == #SIDES and Flat(prey.sides[2].thigh:GetPos() - prey.sides[1].thigh:GetPos(), up)
+	if not left or left:LengthSqr() < 0.01 then left = -maw:GetRight() end
+	left:Normalize()
+	prey.rooted = now
+	for _, side in ipairs(prey.sides) do
+		side.anchor = maw:GetPos() + left * (side.def.out * ROOT_SPREAD)
+		body:SetNW2Vector(side.def.root, side.anchor)
+	end
+	body:SetNW2Float(EvilBarnacle.ROOTED_VAR, now)
+end
+
+local function Raising(prey, now)
+	return prey.rooted ~= nil and now < prey.rooted + ROOT_RAMP + ROOT_HOLD
+end
+
+local function Raise(prey, now, dt)
+	if not prey.rooted or prey.frozen then return end
+	local k = ROOT_K * math.Clamp((now - prey.rooted) / ROOT_RAMP, 0, 1)
+	if k <= 0 then return end
+	local down = prey.maw:GetUp() * ROOT_DROP
+	for _, side in ipairs(prey.sides) do
+		if side.anchor then Spring(side.hand, side.anchor - down, k, ROOT_DAMP, dt) end
+	end
 end
 
 local function Float(prey, on)
@@ -183,7 +213,7 @@ end
 
 local function Still(prey, now)
 	if not prey.frozen then
-		if now < prey.still then return end
+		if now < prey.still or Raising(prey, now) then return end
 		prey.frozen = true
 		local body = prey.body
 		for i = 0, body:GetPhysicsObjectCount() - 1 do
@@ -213,7 +243,7 @@ local function Fight(prey, now, dt, up)
 	local k = Legs(prey, now)
 	Kick(prey, now, dt, up, k)
 	if now - prey.start < PANIC then
-		Claw(prey, now, dt)
+		if not prey.rooted then Claw(prey, now, dt) end
 		Heave(prey, now, up)
 		Plead(prey, now)
 	else
@@ -239,6 +269,7 @@ end
 function EvilBarnacle.Bitten(body)
 	local prey = held[body]
 	if not prey or prey.muffled then return end
+	if EvilFungus and IsValid(prey.maw) then Root(prey, CurTime()) end
 	if prey.said then body:StopSound(prey.said) end
 	Say(prey, PLEAD, 85, math.random(108, 118), 1)
 	prey.muffled = true
@@ -254,6 +285,7 @@ function EvilBarnacle.Free(body, keep)
 	local prey = held[body]
 	held[body] = nil
 	if not prey or not IsValid(body) then return end
+	body:SetNW2Float(EvilBarnacle.ROOTED_VAR, 0)
 	if prey.wired and not keep then EvilFungus.Unwire(body) end
 	Float(prey, false)
 	for i, d in pairs(prey.damping or {}) do
@@ -267,10 +299,13 @@ hook.Add("Think", "EvilBarnaclePrey", function()
 	for body, prey in pairs(held) do
 		if not IsValid(body) or not IsValid(prey.maw) or body.EvilBond ~= prey.maw then
 			held[body] = nil
-		elseif prey.limp then
-			Still(prey, now)
-		elseif prey.fighter then
-			Fight(prey, now, dt, prey.maw:GetUp())
+		else
+			Raise(prey, now, dt)
+			if prey.limp then
+				Still(prey, now)
+			elseif prey.fighter then
+				Fight(prey, now, dt, prey.maw:GetUp())
+			end
 		end
 	end
 end)

@@ -4,6 +4,9 @@ EvilBarnacle.HELD_VAR = "EvilBarnacleHeld"
 EvilBarnacle.GIVE_UP = 3
 EvilBarnacle.LEASH_VAR = "EvilLeash"
 EvilBarnacle.LEASH_BONE_VAR = "EvilLeashBone"
+EvilBarnacle.ROOTED_VAR = "EvilBarnacleRooted"
+EvilBarnacle.ROOT_R_VAR = "EvilBarnacleRootR"
+EvilBarnacle.ROOT_L_VAR = "EvilBarnacleRootL"
 
 EvilBarnacle.Settings = Evil.Settings({
 	id = "evil_barnacle",

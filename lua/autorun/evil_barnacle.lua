@@ -55,10 +55,12 @@ include("evil_api/init.lua")
 AddCSLuaFile("evil_barnacle/sh_settings.lua")
 AddCSLuaFile("evil_barnacle/cl_held.lua")
 AddCSLuaFile("evil_barnacle/cl_leash.lua")
+AddCSLuaFile("evil_barnacle/cl_roots.lua")
 include("evil_barnacle/sh_settings.lua")
 if CLIENT then
 	include("evil_barnacle/cl_held.lua")
 	include("evil_barnacle/cl_leash.lua")
+	include("evil_barnacle/cl_roots.lua")
 else
 	include("evil_barnacle/sv_prey.lua")
 	include("evil_barnacle/sv_barnacle.lua")
