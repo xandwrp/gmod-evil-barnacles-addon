@@ -1,8 +1,11 @@
 local REST = 16
-local LOWER = 40
-local LOWER_TO = 60
 local HOLE = 40
 local LAND = 64
+local LOOK_UP = 32
+local TOSS = 120
+local SETTLE_MIN = 1
+local SETTLE_MAX = 4
+local SETTLE_SPEED = 30
 local REEL = 220
 local REEL_TIME = 12
 local REEL_NEAR = 24
@@ -14,7 +17,7 @@ local LOWER_SOUND = "npc/barnacle/barnacle_tongue_pull%d.wav"
 local WHIP = "weapons/iceaxe/iceaxe_swing1.wav"
 local SLAP = "physics/flesh/flesh_impact_hard%d.wav"
 
-local LOWERING, WALKING, REELING = 1, 2, 3
+local DROPPING, WALKING, REELING = 1, 2, 3
 
 local leashes = {}
 
@@ -88,15 +91,8 @@ local function Throw(b, l, v)
 	return true
 end
 
-local function HeadPhys(body)
-	local bone = body:LookupBone(EvilBarnacle.HEAD)
-	local i = bone and body:TranslateBoneToPhysBone(bone)
-	local phys = i and i >= 0 and body:GetPhysicsObjectNum(i)
-	if IsValid(phys) then return phys end
-end
-
-local function Land(at)
-	local from = at + Vector(0, 0, LOWER_TO)
+local function Away(at)
+	local from = at + Vector(0, 0, LOOK_UP)
 	local spin = math.Rand(0, 360)
 	local best, far = nil, -1
 	for i = 0, 7 do
@@ -105,40 +101,95 @@ local function Land(at)
 		if frac > far then best, far = dir, frac end
 		if far >= 1 then break end
 	end
-	return from + best * (LAND * far)
+	return best
+end
+
+local function Clone(old)
+	local rag = ents.Create("prop_ragdoll")
+	if not IsValid(rag) then return end
+	rag:SetModel(old:GetModel())
+	rag:SetPos(old:GetPos())
+	rag:SetAngles(old:GetAngles())
+	rag:SetSkin(old:GetSkin())
+	for i = 0, old:GetNumBodyGroups() - 1 do rag:SetBodygroup(i, old:GetBodygroup(i)) end
+	rag:SetMaterial(old:GetMaterial())
+	for i = 0, #old:GetMaterials() - 1 do
+		local m = old:GetSubMaterial(i)
+		if m ~= "" then rag:SetSubMaterial(i, m) end
+	end
+	rag:SetColor(old:GetColor())
+	rag:SetRenderMode(old:GetRenderMode())
+	rag:Spawn()
+	rag:Activate()
+	if rag:GetPhysicsObjectCount() ~= old:GetPhysicsObjectCount() then
+		rag:Remove()
+		return
+	end
+	for i = 0, rag:GetPhysicsObjectCount() - 1 do
+		local from, to = old:GetPhysicsObjectNum(i), rag:GetPhysicsObjectNum(i)
+		if IsValid(from) and IsValid(to) then
+			to:SetPos(from:GetPos(), true)
+			to:SetAngles(from:GetAngles())
+			to:Wake()
+		end
+	end
+	for i = 0, old:GetBoneCount() - 1 do
+		local s = old:GetManipulateBoneScale(i)
+		if s.x ~= 1 or s.y ~= 1 or s.z ~= 1 then rag:ManipulateBoneScale(i, s) end
+	end
+	for i = 0, old:GetFlexNum() - 1 do rag:SetFlexWeight(i, old:GetFlexWeight(i)) end
+	rag:SetNW2Vector("EvilColor", old:GetNW2Vector("EvilColor"))
+	rag:SetNW2Vector(EvilFungus.COLOR_VAR, old:GetNW2Vector(EvilFungus.COLOR_VAR))
+	rag:SetNW2Float(EvilFungus.SINCE_VAR, old:GetNW2Float(EvilFungus.SINCE_VAR))
+	rag:SetNW2Float(EvilFungus.CONSUMED_VAR, old:GetNW2Float(EvilFungus.CONSUMED_VAR))
+	rag:SetNW2Float(EvilFungus.STAGE_AT_VAR, old:GetNW2Float(EvilFungus.STAGE_AT_VAR))
+	rag:SetNW2Int(EvilFungus.STAGE_VAR, old:GetNW2Int(EvilFungus.STAGE_VAR))
+	rag:SetNW2Bool(EvilFungus.WHOLE_VAR, old:GetNW2Bool(EvilFungus.WHOLE_VAR))
+	rag.EvilFungusKept = old.EvilFungusKept
+	return rag
+end
+
+local function Watch(old, rag)
+	for _, ply in ipairs(player.GetAll()) do
+		if ply.EvilSocket == old then
+			ply.EvilSocket = rag
+			if not ply:Alive() then ply:SpectateEntity(rag) end
+		end
+	end
 end
 
 function EvilBarnacle.Lower(b, body)
 	local radius = EvilBarnacle.Settings:Get("leash")
 	local hosts = EvilFungus and EvilFungus.Hosts
 	if radius <= 0 or leashes[b] or not (hosts and hosts.Unleash) or b.EvilBond ~= body then return end
-	local floor, head = EvilBarnacle.Below(b), HeadPhys(body)
-	if not floor or not head then return end
+	local floor = EvilBarnacle.Below(b)
+	if not floor then return end
+	local rag = Clone(body)
+	if not rag then return end
+	local w = EvilFungus.Sleep.wired[body]
 	EvilBarnacle.Shed(b, true)
-	head:EnableMotion(false)
-	body.EvilLeash = b
-	leashes[b] = { phase = LOWERING, body = body, head = head, at = floor, land = Land(floor), radius = radius }
-	Point(b, body, EvilBarnacle.HEAD)
+	EvilFungus.Unwire(body)
+	Watch(body, rag)
+	body:Remove()
+	local push = Away(floor) * TOSS
+	for i = 0, rag:GetPhysicsObjectCount() - 1 do
+		local phys = rag:GetPhysicsObjectNum(i)
+		if IsValid(phys) then phys:SetVelocity(push) end
+	end
+	rag.EvilLeash = b
+	leashes[b] = { phase = DROPPING, body = rag, fungus = w and w.fungus, at = floor, radius = radius, since = CurTime() }
+	Point(b, rag, EvilBarnacle.HEAD)
 	b:EmitSound(string.format(LOWER_SOUND, math.random(1, 3)), 75, math.random(80, 95))
 end
 
-local function Lowering(b, l, dt)
-	local body, head = l.body, l.head
-	if not IsValid(body) or not IsValid(head) then return Finish(b) end
-	local pos = head:GetPos()
-	local gap = l.land - pos
-	local dist, step = gap:Length(), LOWER * dt
-	if dist > 1 then
-		head:SetPos(dist > step and pos + gap * (step / dist) or l.land)
-		return
-	end
-	head:EnableMotion(true)
-	head:Wake()
+local function Dropping(b, l, now)
+	local rag = l.body
+	if not IsValid(rag) then return Finish(b) end
+	local root = rag:GetPhysicsObject()
+	local wait = now - l.since
+	if wait < SETTLE_MIN or wait < SETTLE_MAX and IsValid(root) and root:GetVelocity():Length() > SETTLE_SPEED then return end
 	l.tether = { at = l.at, radius = l.radius, hole = math.min(HOLE, l.radius * 0.5), catch = function(_, v) return Throw(b, l, v) end }
-	if not EvilFungus.Hosts.Rise(EvilFungus.Sleep.wired[body] or { rag = body }, l.tether) then
-		EvilFungus.Unwire(body)
-		return Finish(b)
-	end
+	if not EvilFungus.Hosts.Rise({ rag = rag, fungus = l.fungus }, l.tether) then return Finish(b) end
 	l.phase = WALKING
 end
 
@@ -164,22 +215,16 @@ local function Reeling(b, l, now)
 end
 
 local function Cut(b, l)
-	if l.phase == LOWERING then
-		if IsValid(l.head) then
-			l.head:EnableMotion(true)
-			l.head:Wake()
-		end
-		if IsValid(l.body) then EvilFungus.Unwire(l.body) end
-	elseif l.phase == WALKING then
+	if l.phase == WALKING then
 		EvilFungus.Hosts.Unleash(l.body)
-	elseif IsValid(l.victim) then
+	elseif l.phase == REELING and IsValid(l.victim) then
 		return Slip(b, l.victim)
 	end
 	Finish(b)
 end
 
 hook.Add("Think", "EvilBarnacleLeash", function()
-	local now, dt = CurTime(), FrameTime()
+	local now = CurTime()
 	for b, l in pairs(leashes) do
 		if not IsValid(b) or b:Health() <= 0 then
 			Cut(b, l)
@@ -187,8 +232,8 @@ hook.Add("Think", "EvilBarnacleLeash", function()
 			Reeling(b, l, now)
 		else
 			if Lifting(b) then b:Input("LetGo") end
-			if l.phase == LOWERING then
-				Lowering(b, l, dt)
+			if l.phase == DROPPING then
+				Dropping(b, l, now)
 			else
 				Walking(b, l)
 			end
