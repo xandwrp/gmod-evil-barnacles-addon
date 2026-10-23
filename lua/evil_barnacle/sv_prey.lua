@@ -189,7 +189,7 @@ local function Still(prey, now)
 	end
 	if now < (prey.wireAt or 0) or not (EvilFungus and EvilFungus.Wire) then return end
 	prey.wireAt = now + WIRE_EVERY
-	prey.wired = IsValid(prey.head) and EvilFungus.Wire(prey.body, prey.head:GetPos())
+	prey.wired = IsValid(prey.head) and EvilFungus.Wire(prey.body, prey.head:GetPos(), EvilBarnacle.Settings:Get("fungus_time"))
 end
 
 local function Legs(prey, now)
