@@ -7,40 +7,40 @@ SIZE = 128
 INK = (226, 219, 207)
 BG_IN = (42, 38, 41)
 BG_OUT = (12, 11, 12)
-BOX = (118, 116)
-TOP = 6
+BOX = (112, 84)
+CEILING = 24
 
 SS = 8
-W, H = 170, 170
+W, H = 170, 120
 CX = 85
-SACK = [(60, 2), (50, 10), (45, 22), (47, 34), (55, 45), (67, 53), (77, 56), (93, 56), (103, 53), (115, 45), (123, 34), (125, 22), (120, 10), (110, 2)]
-RIBS = [(16, 0.78), (30, 0.74), (42, 0.62)]
-RIB_WIDTH = 1.1
-RIB_SAG = 5
-TEETH = [(-10, 54), (-5, 56), (0, 56.5), (5, 56), (10, 54)]
-TOOTH = (2.2, 4.5)
-STRANDS = [
-    [(60, 3), (36, 4), (24, 2), (10, 4), (0, 3)],
-    [(36, 4), (30, 9), (31, 15)],
-    [(24, 2), (18, 7)],
-    [(110, 3), (134, 5), (148, 2), (160, 4), (170, 3)],
-    [(134, 5), (139, 11), (137, 17)],
-    [(148, 2), (153, 8)],
+SACK = [
+    (66, 0), (104, 0), (111, 4), (117, 10), (122, 17), (124, 26), (120, 34), (114, 40), (106, 45), (98, 48), (92, 49),
+    (89, 52), (85, 54), (81, 52), (78, 49), (72, 48), (64, 45), (56, 40), (50, 33), (47, 25), (49, 16), (54, 9), (59, 4),
 ]
-STRAND_R = (1.6, 0.6)
-HEAD = (CX, 61, 6)
-NECK = [(CX, 64), (CX, 68)]
-TORSO = [(CX - 9, 67), (CX + 9, 67), (CX + 8, 84), (CX + 6, 98), (CX - 6, 98), (CX - 8, 84)]
-ARMS = [
-    [(CX - 9, 68), (CX - 12, 82), (CX - 12, 95), (CX - 11, 101)],
-    [(CX + 9, 68), (CX + 12, 82), (CX + 12, 95), (CX + 11, 101)],
+FOLDS = [[(49, 27), (55, 28), (60, 27)], [(123, 24), (117, 26), (112, 25)], [(70, 45), (73, 41)], [(101, 44), (98, 40)]]
+FOLD_R = 1.0
+LUMPS = [(52, 12, 4), (47, 22, 3.5), (52, 36, 4.5), (62, 44, 3.5), (76, 49, 3), (117, 12, 4.5), (123, 23, 3), (118, 37, 4), (107, 45, 4), (95, 49, 3)]
+TONGUE = [(85, 52), (86.5, 64), (84, 78), (86.5, 92), (85, 106)]
+TONGUE_R = (2.6, 1.5)
+TIP = (85, 107, 3.0)
+FEELERS = [
+    [(80, 50), (76, 59), (77.5, 68)],
+    [(90, 50), (95, 57), (93.5, 64)],
 ]
-ARM_R = (3.0, 2.0)
-LEGS = [
-    [(CX - 3.5, 97), (CX - 4.5, 120), (CX - 4, 142), (CX - 5, 150)],
-    [(CX + 3.5, 97), (CX + 4.5, 120), (CX + 4, 142), (CX + 5, 150)],
+FEELER_R = (1.6, 0.6)
+ROOTS = [
+    [(64, 1), (55, 3.5), (47, 1.5), (38, 4.5), (30, 2), (22, 5)],
+    [(55, 3.5), (52, 9), (54, 14)],
+    [(47, 1.5), (42, 6), (36, 8)],
+    [(38, 4.5), (35, 11)],
+    [(30, 2), (24, 0.5)],
+    [(106, 1), (115, 4), (123, 2), (132, 5.5), (141, 3), (149, 6)],
+    [(115, 4), (118, 10), (116, 15)],
+    [(123, 2), (129, 7), (135, 9)],
+    [(132, 5.5), (134, 12)],
+    [(141, 3), (147, 0.5)],
 ]
-LEG_R = (4.0, 2.6)
+ROOT_R = (2.0, 0.6)
 OUT = os.path.join(os.path.dirname(__file__), "..", "materials", "entities", "evil_barnacle.png")
 PREVIEW = os.path.join(os.path.dirname(__file__), "..", "renders", "spawnicon_preview.png")
 
@@ -78,35 +78,19 @@ def spline(points, closed=False, n=8):
     return out if closed else out + [points[-1]]
 
 
-def width_at(outline, y):
-    xs = []
-    for (x0, y0), (x1, y1) in zip(outline, outline[1:] + outline[:1]):
-        if (y0 - y) * (y1 - y) <= 0 and y0 != y1:
-            xs.append(x0 + (x1 - x0) * (y - y0) / (y1 - y0))
-    return min(xs), max(xs)
-
-
 def creature():
     im, draw = layer()
-    for strand in STRANDS:
-        stroke(draw, spline(strand), *STRAND_R)
-    outline = spline(SACK, closed=True)
-    draw.polygon([(x * SS, y * SS) for x, y in outline], fill=255)
-    for y, k in RIBS:
-        left, right = width_at(outline, y)
-        half = (right - left) / 2 * k
-        rib = [(CX - half + 2 * half * i / 20, y + RIB_SAG * math.sin(math.pi * i / 20)) for i in range(21)]
-        stroke(draw, rib, RIB_WIDTH, RIB_WIDTH, 0)
-    for x, y in TEETH:
-        draw.polygon([((CX + x - TOOTH[0]) * SS, (y - 1) * SS), ((CX + x + TOOTH[0]) * SS, (y - 1) * SS),
-                      ((CX + x) * SS, (y + TOOTH[1]) * SS)], fill=255)
-    for limb in LEGS:
-        stroke(draw, spline(limb), *LEG_R)
-    draw.polygon([(x * SS, y * SS) for x, y in spline(TORSO, closed=True)], fill=255)
-    for limb in ARMS:
-        stroke(draw, spline(limb), *ARM_R)
-    stroke(draw, NECK, 3, 3)
-    dot(draw, *HEAD)
+    for root in ROOTS:
+        stroke(draw, spline(root), *ROOT_R)
+    stroke(draw, spline(TONGUE), *TONGUE_R)
+    dot(draw, *TIP)
+    for feeler in FEELERS:
+        stroke(draw, spline(feeler), *FEELER_R)
+    draw.polygon([(x * SS, y * SS) for x, y in spline(SACK, closed=True)], fill=255)
+    for lump in LUMPS:
+        dot(draw, *lump)
+    for fold in FOLDS:
+        stroke(draw, spline(fold), FOLD_R, FOLD_R * 0.5, 0)
     return im
 
 
@@ -120,7 +104,7 @@ def tile(alpha):
         for i in range(SIZE):
             t = min(1, math.hypot(i - SIZE / 2, j - SIZE / 2) / (SIZE * 0.72)) ** 2
             px[i, j] = tuple(round(a + (b - a) * t) for a, b in zip(BG_IN, BG_OUT))
-    bg.paste(Image.new("RGB", alpha.size, INK), ((SIZE - alpha.width) // 2, TOP), alpha)
+    bg.paste(Image.new("RGB", alpha.size, INK), ((SIZE - alpha.width) // 2, CEILING), alpha)
     return bg
 
 
