@@ -109,7 +109,7 @@ end
 hook.Add("EntityTakeDamage", "EvilBarnacleBond", function(ent, dmg)
 	local other = ent.EvilBond
 	if not IsValid(other) then return end
-	if ent:IsNPC() then return true end
+	if ent:IsNPC() or dmg:IsDamageType(DMG_CRUSH) then return true end
 	ent.EvilHealth = ent.EvilHealth - dmg:GetDamage()
 	if ent.EvilHealth <= 0 then EvilBarnacle.Unbond(other, dmg:GetAttacker()) end
 end)

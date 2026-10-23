@@ -13,8 +13,8 @@ local HEAVE, HEAVE_MIN, HEAVE_MAX = 160, 0.8, 1.8
 local PLEAD_MIN, PLEAD_MAX = 1.4, 2.8
 local MOAN_MIN, MOAN_MAX = 2.5, 5
 local LIMP_LIN, LIMP_ANG = 0.4, 1.2
-local TWITCH, TWITCH_MIN, TWITCH_MAX = 70, 5, 12
-local TWITCH_MOAN = 0.3
+local SETTLE = 3
+local WIRE_EVERY = 2
 local PANIC_FACE = {
 	jaw_drop = 0.8,
 	right_lid_raiser = 1,
@@ -164,7 +164,7 @@ end
 local function Limp(prey, now)
 	prey.limp = true
 	Float(prey, false)
-	prey.twitch = now + math.Rand(TWITCH_MIN, TWITCH_MAX)
+	prey.still = now + SETTLE
 	prey.damping = {}
 	local body = prey.body
 	for i = 0, body:GetPhysicsObjectCount() - 1 do
@@ -177,16 +177,19 @@ local function Limp(prey, now)
 	end
 end
 
-local function Twitch(prey, now)
-	if now < prey.twitch then return end
-	prey.twitch = now + math.Rand(TWITCH_MIN, TWITCH_MAX)
-	local body = prey.body
-	local phys = body:GetPhysicsObjectNum(math.random(0, body:GetPhysicsObjectCount() - 1))
-	if IsValid(phys) then
-		phys:Wake()
-		phys:AddVelocity(VectorRand() * TWITCH)
+local function Still(prey, now)
+	if not prey.frozen then
+		if now < prey.still then return end
+		prey.frozen = true
+		local body = prey.body
+		for i = 0, body:GetPhysicsObjectCount() - 1 do
+			local phys = body:GetPhysicsObjectNum(i)
+			if IsValid(phys) then phys:EnableMotion(false) end
+		end
 	end
-	if prey.fighter and math.random() < TWITCH_MOAN then Say(prey, MOAN, 55, math.random(72, 84), 0.35) end
+	if now < (prey.wireAt or 0) or not (EvilFungus and EvilFungus.Wire) then return end
+	prey.wireAt = now + WIRE_EVERY
+	prey.wired = IsValid(prey.head) and EvilFungus.Wire(prey.body, prey.head:GetPos())
 end
 
 local function Legs(prey, now)
@@ -235,6 +238,7 @@ function EvilBarnacle.Free(body)
 	local prey = held[body]
 	held[body] = nil
 	if not prey or not IsValid(body) then return end
+	if prey.wired then EvilFungus.Unwire(body) end
 	Float(prey, false)
 	for i, d in pairs(prey.damping or {}) do
 		local phys = body:GetPhysicsObjectNum(i)
@@ -248,7 +252,7 @@ hook.Add("Think", "EvilBarnaclePrey", function()
 		if not IsValid(body) or not IsValid(prey.maw) or body.EvilBond ~= prey.maw then
 			held[body] = nil
 		elseif prey.limp then
-			Twitch(prey, now)
+			Still(prey, now)
 		elseif prey.fighter then
 			Fight(prey, now, dt, prey.maw:GetUp())
 		end
