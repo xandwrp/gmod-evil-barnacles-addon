@@ -1,5 +1,6 @@
 local MASH_DECAY = 0.1
 local SHUN = 3
+local CARRY = { "start", "stride", "plead", "heave", "burst", "burstEnd", "muffled" }
 
 local barnacles = {}
 local caught = {}
@@ -102,7 +103,19 @@ local function Transfer(b, c)
 	if IsValid(b:GetInternalVariable("m_hRagdoll")) then return Drop(b, c) end
 	Release(b, c)
 	if IsValid(v) then v:Remove() end
-	EvilBarnacle.Bond(b, body, head, health, c.prey)
+	local prey = c.prey
+	local fresh = EvilBarnacle.Clone(body)
+	if fresh then
+		local was = prey
+		EvilBarnacle.Calm(was)
+		body:Remove()
+		body = fresh
+		prey = EvilBarnacle.Prey(body, b, true)
+		if was then
+			for _, k in ipairs(CARRY) do prey[k] = was[k] end
+		end
+	end
+	EvilBarnacle.Bond(b, body, head, health, prey)
 end
 
 local function Catch(b, v)

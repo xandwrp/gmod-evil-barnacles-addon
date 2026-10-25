@@ -1,4 +1,3 @@
-local REST = 16
 local HOLE = 40
 local LAND = 64
 local LOOK_UP = 32
@@ -40,7 +39,7 @@ local function Finish(b)
 	if l and IsValid(l.body) and l.body.EvilLeash == b then l.body.EvilLeash = nil end
 	if not IsValid(b) then return end
 	Point(b)
-	if b:Health() > 0 and not IsValid(b.EvilBond) then b:SetKeyValue("RestDist", tostring(REST)) end
+	EvilBarnacle.Rest(b)
 end
 
 local function Pose(b, ent)
@@ -78,7 +77,7 @@ local function Throw(b, l, v)
 	if IsValid(l.body) then l.body.EvilLeash = nil end
 	l.phase, l.victim, l.since = REELING, v, CurTime()
 	b.EvilPose = Pose
-	b:SetKeyValue("RestDist", tostring(REST))
+	EvilBarnacle.Rest(b)
 	Point(b, rag, FOOT)
 	b:EmitSound(WHIP, 75, math.random(70, 85))
 	rag:EmitSound(string.format(SLAP, math.random(1, 3)), 75)
@@ -139,13 +138,15 @@ function EvilBarnacle.Clone(old)
 	end
 	for i = 0, old:GetFlexNum() - 1 do rag:SetFlexWeight(i, old:GetFlexWeight(i)) end
 	rag:SetNW2Vector("EvilColor", old:GetNW2Vector("EvilColor"))
-	rag:SetNW2Vector(EvilFungus.COLOR_VAR, old:GetNW2Vector(EvilFungus.COLOR_VAR))
-	rag:SetNW2Float(EvilFungus.SINCE_VAR, old:GetNW2Float(EvilFungus.SINCE_VAR))
-	rag:SetNW2Float(EvilFungus.CONSUMED_VAR, old:GetNW2Float(EvilFungus.CONSUMED_VAR))
-	rag:SetNW2Float(EvilFungus.STAGE_AT_VAR, old:GetNW2Float(EvilFungus.STAGE_AT_VAR))
-	rag:SetNW2Int(EvilFungus.STAGE_VAR, old:GetNW2Int(EvilFungus.STAGE_VAR))
-	rag:SetNW2Bool(EvilFungus.WHOLE_VAR, old:GetNW2Bool(EvilFungus.WHOLE_VAR))
-	rag.EvilFungusKept = old.EvilFungusKept
+	if EvilFungus then
+		rag:SetNW2Vector(EvilFungus.COLOR_VAR, old:GetNW2Vector(EvilFungus.COLOR_VAR))
+		rag:SetNW2Float(EvilFungus.SINCE_VAR, old:GetNW2Float(EvilFungus.SINCE_VAR))
+		rag:SetNW2Float(EvilFungus.CONSUMED_VAR, old:GetNW2Float(EvilFungus.CONSUMED_VAR))
+		rag:SetNW2Float(EvilFungus.STAGE_AT_VAR, old:GetNW2Float(EvilFungus.STAGE_AT_VAR))
+		rag:SetNW2Int(EvilFungus.STAGE_VAR, old:GetNW2Int(EvilFungus.STAGE_VAR))
+		rag:SetNW2Bool(EvilFungus.WHOLE_VAR, old:GetNW2Bool(EvilFungus.WHOLE_VAR))
+		rag.EvilFungusKept = old.EvilFungusKept
+	end
 	return rag
 end
 
