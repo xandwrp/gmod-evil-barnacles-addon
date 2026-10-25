@@ -3,6 +3,7 @@ local RANGE = 3000
 local LIGHT_EVERY = 0.5
 local SIDES = 4
 local MAX_QUADS = 9000
+local BATCH = 2500
 
 local ROPE_GROW = 0.6
 local ROPE_SAMPLES = 10
@@ -221,13 +222,36 @@ local function Quads(shapes, first)
 	return q
 end
 
+local function Batch(shapes, first, last, S)
+	for k = first, last do
+		local sh = shapes[k]
+		S.Polyline(sh[1], sh[2], vector_up, SIDES, sh[3], sh[4], sh[5], sh[6])
+	end
+end
+
 local function Emit(mat, shapes, S)
-	local quads = Quads(shapes, 1)
-	if quads == 0 then return end
+	local i, n = 1, #shapes
+	if n == 0 then return end
 	render.SetMaterial(mat)
-	mesh.Begin(MATERIAL_QUADS, quads)
-	for _, sh in ipairs(shapes) do S.Polyline(sh[1], sh[2], vector_up, SIDES, sh[3], sh[4], sh[5], sh[6]) end
-	mesh.End()
+	while i <= n do
+		local quads, last = 0, i
+		while last <= n do
+			local q = (#shapes[last][1] - 1) * SIDES
+			if quads > 0 and quads + q > BATCH then break end
+			quads = quads + q
+			last = last + 1
+		end
+		if quads > 0 then
+			mesh.Begin(MATERIAL_QUADS, quads)
+			local ok, err = pcall(Batch, shapes, i, last - 1, S)
+			mesh.End()
+			if not ok then
+				ErrorNoHalt("Evil barnacles couldn't draw a cocoon: ", err, "\n")
+				return
+			end
+		end
+		i = last
+	end
 end
 
 local function Draw()
