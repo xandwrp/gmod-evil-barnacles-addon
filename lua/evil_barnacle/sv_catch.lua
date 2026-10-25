@@ -162,6 +162,12 @@ hook.Add("Think", "EvilBarnacleCatch", function()
 	for b, c in pairs(caught) do Hang(b, c, now, dt) end
 end)
 
+hook.Add("EntityTakeDamage", "EvilBarnacleKnocks", function(ent, dmg)
+	if not ent.EvilBarnacle or not dmg:IsDamageType(DMG_CRUSH) then return end
+	local by = dmg:GetAttacker()
+	if IsValid(by) and string.StartWith(by:GetClass(), "prop_ragdoll") then return true end
+end)
+
 hook.Add("EntityTakeDamage", "EvilBarnacleCatch", function(ent, dmg)
 	local b = ent.EvilCaught
 	if not IsValid(b) or not caught[b] or caught[b].victim ~= ent then return end
