@@ -119,6 +119,10 @@ local function Transfer(b, c)
 end
 
 local function Catch(b, v)
+	if not v:IsPlayer() and not v:IsNPC() then
+		if Evil.Owner(v) == b then b:Input("LetGo") end
+		return
+	end
 	if EvilBarnacle.Cairne(b, v) then return end
 	if v:IsPlayer() then
 		if not v:Alive() or not Evil.Claim(v, b) then return end

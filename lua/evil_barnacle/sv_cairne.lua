@@ -187,6 +187,7 @@ local function Adopt(c, body)
 	c.body = body
 	body.EvilCairne = true
 	body:SetCollisionGroup(COLLISION_GROUP_WEAPON)
+	body:AddSolidFlags(FSOLID_NOT_SOLID)
 	if IsValid(c.maw) then Evil.Claim(body, c.maw) end
 	c.prey = EvilBarnacle.Prey(body, c.maw, true)
 	EvilBarnacle.Calm(c.prey)
@@ -203,6 +204,7 @@ local function Drop(c)
 	hung[body], cairns[body] = nil, nil
 	if not IsValid(body) then return end
 	body.EvilCairne = nil
+	body:RemoveSolidFlags(FSOLID_NOT_SOLID)
 	body:SetNW2Float(EvilBarnacle.CAIRNE_VAR, 0)
 	Float(c, false)
 	Evil.Unclaim(body)
@@ -363,7 +365,8 @@ function EvilBarnacle.Cairne(b, v)
 	if player then
 		body = Evil.Grip(v, b)
 	elseif not IsValid(b:GetInternalVariable("m_hRagdoll")) then
-		body = rag
+		body = EvilBarnacle.Clone(rag)
+		if body then rag:Remove() else body = rag end
 		v:Remove()
 	end
 	if not IsValid(body) then return true end
