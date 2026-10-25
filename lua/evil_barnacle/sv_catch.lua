@@ -118,9 +118,14 @@ local function Transfer(b, c)
 	EvilBarnacle.Bond(b, body, head, health, prey)
 end
 
+local function Host(v)
+	local hosts = EvilFungus and EvilFungus.Hosts
+	return hosts and hosts.list and hosts.list[v] ~= nil
+end
+
 local function Catch(b, v)
 	if not v:IsPlayer() and not v:IsNPC() then
-		if Evil.Owner(v) == b then b:Input("LetGo") end
+		if Evil.Owner(v) == b or Host(v) then b:Input("LetGo") end
 		return
 	end
 	if EvilBarnacle.Cairne(b, v) then return end
