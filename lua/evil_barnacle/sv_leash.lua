@@ -169,6 +169,7 @@ function EvilBarnacle.Lower(b, body)
 	if not rag then return end
 	local w = EvilFungus.Sleep.wired[body]
 	EvilBarnacle.Shed(b, true)
+	b:SetKeyValue("RestDist", tostring(b:GetPos().z - floor.z))
 	EvilFungus.Unwire(body)
 	Watch(body, rag)
 	body:Remove()
