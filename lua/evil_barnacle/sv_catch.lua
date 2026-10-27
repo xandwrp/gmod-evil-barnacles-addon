@@ -104,7 +104,7 @@ local function Transfer(b, c)
 	Release(b, c)
 	if IsValid(v) then v:Remove() end
 	local prey = c.prey
-	local fresh = EvilBarnacle.Clone(body)
+	local fresh = not c.fed and EvilBarnacle.Clone(body)
 	if fresh then
 		local was = prey
 		EvilBarnacle.Calm(was)
@@ -123,9 +123,17 @@ local function Host(v)
 	return hosts and hosts.list and hosts.list[v] ~= nil
 end
 
+local function Fed(v)
+	return v:GetClass() == "prop_ragdoll" and v.EvilHealth == nil and not v.EvilFungusSleeper and not Evil.Owner(v) and Head(v) ~= nil
+end
+
 local function Catch(b, v)
 	if not v:IsPlayer() and not v:IsNPC() then
-		if Evil.Owner(v) == b or Host(v) then b:Input("LetGo") end
+		if Evil.Owner(v) == b or Host(v) then
+			b:Input("LetGo")
+		elseif Fed(v) then
+			caught[b] = { body = v, fed = true }
+		end
 		return
 	end
 	if EvilBarnacle.Cairne(b, v) then return end
@@ -148,7 +156,8 @@ local function Hang(b, c, now, dt)
 	if not IsValid(b) or b:Health() <= 0 then return Drop(b, c) end
 	local lifting = b:GetInternalVariable("m_bLiftingPrey")
 	if c.body then
-		if not IsValid(c.body) or b:GetInternalVariable("m_hRagdoll") ~= c.body then return Drop(b, c) end
+		local on = c.fed and b:GetEnemy() or b:GetInternalVariable("m_hRagdoll")
+		if not IsValid(c.body) or on ~= c.body then return Drop(b, c) end
 		if not lifting then return Transfer(b, c) end
 		EvilBarnacle.Thrash(c.prey, now, dt)
 		return
