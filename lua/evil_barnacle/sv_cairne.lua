@@ -216,14 +216,19 @@ local function Drop(c)
 	end
 end
 
-local function Escape(c)
+local function Unmash(c)
 	local v = c.victim
 	c.victim = nil
-	Drop(c)
 	if not IsValid(v) then return end
 	local m = Evil.Mashing(v)
 	if m and m.source == c.maw then Evil.StopMash(v) end
-	Evil.LetGo(v, 1)
+	return v
+end
+
+local function Escape(c)
+	local v = Unmash(c)
+	Drop(c)
+	if v then Evil.LetGo(v, 1) end
 end
 
 local function Lock(c)
@@ -233,9 +238,7 @@ local function Lock(c)
 		Escape(c)
 		return false
 	end
-	c.victim = nil
-	local m = Evil.Mashing(v)
-	if m and m.source == c.maw then Evil.StopMash(v) end
+	Unmash(c)
 	hung[old], cairns[old] = nil, nil
 	v.EvilSocket = rag
 	v:SetNW2Float(EvilBarnacle.HELD_VAR, CurTime())
@@ -323,7 +326,10 @@ local function Hang(c, now, dt)
 	local t = now - c.start
 	local v = c.victim
 	if v then
-		if not IsValid(v) or v:Alive() and Evil.Downed(v) ~= c.body then return Drop(c) end
+		if not IsValid(v) or v:Alive() and Evil.Downed(v) ~= c.body then
+			Unmash(c)
+			return Drop(c)
+		end
 		if (t >= FIGHT or not v:Alive()) and not Lock(c) then return end
 	end
 	if t < HOIST and not (IsValid(c.maw) and c.maw:Health() > 0) then return Escape(c) end
@@ -343,6 +349,7 @@ hook.Add("Think", "EvilBarnacleCairne", function()
 	for _, c in ipairs(list) do
 		if not IsValid(c.body) then
 			hung[c.body], cairns[c.body] = nil, nil
+			Unmash(c)
 		elseif hung[c.body] == c then
 			Hang(c, now, dt)
 		end

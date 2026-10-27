@@ -203,7 +203,10 @@ end
 local function Reeling(b, l, now)
 	local v = l.victim
 	local rag = IsValid(v) and Evil.Downed(v)
-	if not IsValid(rag) or Evil.Owner(v) ~= b then return Finish(b) end
+	if not IsValid(rag) or Evil.Owner(v) ~= b then
+		if IsValid(v) then return Slip(b, v) end
+		return Finish(b)
+	end
 	if now - l.since > REEL_TIME then return Slip(b, v) end
 	local p = Foot(rag)
 	local lifting = Lifting(b)
