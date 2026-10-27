@@ -1,5 +1,6 @@
 local MASH_DECAY = 0.1
 local SHUN = 3
+local STRAY = 64
 local CARRY = { "start", "stride", "plead", "heave", "burst", "burstEnd", "muffled" }
 
 local barnacles = {}
@@ -14,6 +15,69 @@ local function Head(body)
 	local bone = body:LookupBone(EvilBarnacle.HEAD)
 	local head = bone and body:TranslateBoneToPhysBone(bone)
 	if head and head >= 0 then return head end
+end
+
+local function Posed(v, bone)
+	if not bone or bone < 0 or not (v:BoneHasFlag(bone, BONE_USED_BY_HITBOX) or v:BoneHasFlag(bone, BONE_USED_BY_ATTACHMENT)) then return end
+	local m = v:GetBoneMatrix(bone)
+	if not m then return end
+	local p = m:GetTranslation()
+	if p.x ~= p.x or p.y ~= p.y or p.z ~= p.z then return end
+	local reach = STRAY + v:BoundingRadius()
+	if p:DistToSqr(v:WorldSpaceCenter()) < reach * reach then return m end
+end
+
+local function Above(body, i)
+	local bone = body:GetBoneParent(body:TranslatePhysBoneToBone(i))
+	while bone and bone >= 0 do
+		local p = body:TranslateBoneToPhysBone(bone)
+		if p and p >= 0 and p ~= i then return p end
+		bone = body:GetBoneParent(bone)
+	end
+end
+
+local function Pose(v, body)
+	local n = body:GetPhysicsObjectCount()
+	local rest, pose = {}, {}
+	for i = 0, n - 1 do
+		local phys = body:GetPhysicsObjectNum(i)
+		if IsValid(phys) then
+			local m = Matrix()
+			m:SetTranslation(phys:GetPos())
+			m:SetAngles(phys:GetAngles())
+			rest[i] = m
+			pose[i] = Posed(v, body:TranslatePhysBoneToBone(i))
+		end
+	end
+	local function Place(i, depth)
+		if pose[i] or not rest[i] or depth > n then return pose[i] end
+		local p = Above(body, i)
+		local pm = p and rest[p] and Place(p, depth + 1)
+		if pm then pose[i] = pm * rest[p]:GetInverseTR() * rest[i] end
+		return pose[i]
+	end
+	for i = 0, n - 1 do
+		local m = Place(i, 0)
+		if m then
+			local phys = body:GetPhysicsObjectNum(i)
+			phys:SetPos(m:GetTranslation(), true)
+			phys:SetAngles(m:GetAngles())
+			phys:SetVelocity(vector_origin)
+			phys:Wake()
+		end
+	end
+end
+
+local function Nearest(body, at)
+	local best, near
+	for i = 0, body:GetPhysicsObjectCount() - 1 do
+		local phys = body:GetPhysicsObjectNum(i)
+		if IsValid(phys) then
+			local d = phys:GetPos():DistToSqr(at)
+			if not near or d < near then best, near = i, d end
+		end
+	end
+	return best
 end
 
 local function Corpse(v)
@@ -31,19 +95,11 @@ local function Corpse(v)
 	body:SetNW2Vector("EvilColor", v:GetPlayerColor())
 	body:Spawn()
 	body:Activate()
-	local head = Head(body)
+	Pose(v, body)
+	local head = Head(body) or Nearest(body, v:EyePos())
 	if not head then
 		body:Remove()
 		return
-	end
-	for i = 0, body:GetPhysicsObjectCount() - 1 do
-		local phys = body:GetPhysicsObjectNum(i)
-		local m = IsValid(phys) and v:GetBoneMatrix(body:TranslatePhysBoneToBone(i))
-		if m then
-			phys:SetPos(m:GetTranslation(), true)
-			phys:SetAngles(m:GetAngles())
-			phys:Wake()
-		end
 	end
 	return body, head
 end
