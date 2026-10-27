@@ -147,9 +147,17 @@ end
 hook.Add("EntityTakeDamage", "EvilBarnacleBond", function(ent, dmg)
 	local other = ent.EvilBond
 	if not IsValid(other) then return end
-	if ent:IsNPC() or dmg:IsDamageType(DMG_CRUSH) then return true end
+	if dmg:IsDamageType(DMG_CRUSH) then return true end
+	if ent:IsNPC() then
+		if pulls[ent] or ent:GetInternalVariable("m_bLiftingPrey") then return end
+		return true
+	end
 	ent.EvilHealth = ent.EvilHealth - dmg:GetDamage()
 	if ent.EvilHealth <= 0 then EvilBarnacle.Unbond(other, dmg:GetAttacker()) end
+end)
+
+hook.Add("PostEntityTakeDamage", "EvilBarnacleBond", function(ent)
+	if ent:IsNPC() and IsValid(ent.EvilBond) and ent:Health() <= 0 then EvilBarnacle.Shed(ent) end
 end)
 
 local function Graze(body, from, to)
