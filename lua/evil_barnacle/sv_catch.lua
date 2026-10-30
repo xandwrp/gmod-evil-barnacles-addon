@@ -152,7 +152,7 @@ end
 
 local function Transfer(b, c)
 	local v, body = c.victim, c.body
-	local head = Head(body)
+	local head = Head(body) or Nearest(body, b:GetPos())
 	if not head then return Drop(b, c) end
 	local health = IsValid(v) and math.max(v:GetMaxHealth(), 1) or 100
 	b:Input("LetGo")
