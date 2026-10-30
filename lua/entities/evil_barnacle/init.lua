@@ -18,7 +18,7 @@ end
 local function Fungus(pos, normal, ply)
 	local strands = EvilBarnacle.Settings:Get("fungus")
 	if strands <= 0 or not (EvilFungus and EvilFungus.Plant) then return end
-	EvilFungus.Plant(pos, normal, FUNGUS_MASS + strands * FUNGUS_PER_STRAND, nil, ply, strands)
+	return EvilFungus.Plant(pos, normal, FUNGUS_MASS + strands * FUNGUS_PER_STRAND, nil, ply, strands)
 end
 
 function ENT:SpawnFunction(ply, tr)
@@ -27,6 +27,12 @@ function ENT:SpawnFunction(ply, tr)
 	if not pos then return end
 	local barnacle = EvilBarnacle.Spawn(pos, ply:EyeAngles().y + 180)
 	if not barnacle then return end
-	Fungus(pos, normal, ply)
+	local fungus = Fungus(pos, normal, ply)
+	if IsValid(fungus) then
+		local limit = fungus.Limit
+		barnacle:CallOnRemove("EvilBarnacleFungus", function()
+			if barnacle:Health() > 0 and IsValid(fungus) and not fungus.Absorbed and fungus.Limit == limit then fungus:Remove() end
+		end)
+	end
 	return barnacle
 end
