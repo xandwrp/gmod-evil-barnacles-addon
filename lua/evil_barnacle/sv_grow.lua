@@ -82,3 +82,10 @@ timer.Create("EvilBarnacleGrow", SCAN, 0, function()
 		end
 	end
 end)
+
+hook.Add("EvilFungusCleared", "EvilBarnacleGrow", function()
+	for barnacle in pairs(grown) do
+		if IsValid(barnacle) then barnacle:Remove() end
+		grown[barnacle] = nil
+	end
+end)
