@@ -263,6 +263,12 @@ hook.Add("PlayerDeathThink", "EvilBarnacleSocket", function(ply)
 	ply:SetNW2Float(EvilBarnacle.HELD_VAR, 0)
 end)
 
+hook.Add("SetupPlayerVisibility", "EvilBarnacleSocket", function(ply)
+	local body = ply.EvilSocket
+	if IsValid(body) then AddOriginToPVS(body:WorldSpaceCenter()) end
+	if IsValid(ply.EvilCaught) then AddOriginToPVS(ply:WorldSpaceCenter()) end
+end)
+
 hook.Add("PlayerSpawn", "EvilBarnacleSocket", function(ply)
 	ply.EvilSocket = nil
 	ply:SetNW2Float(EvilBarnacle.HELD_VAR, 0)
